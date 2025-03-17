@@ -1,4 +1,3 @@
-using codecrafters_redis.src.Tools;
 using System.Collections;
 using System.Net;
 using System.Net.Sockets;
@@ -10,29 +9,38 @@ Console.WriteLine("Logs from your program will appear here!");
 TcpListener server = new TcpListener(IPAddress.Any, 6379);
 server.Start();
 
-while (true)
+while (true) // Keep the server running
 {
-    Socket socket = await server.AcceptSocketAsync(); // wait for client
-    HandleSocketAsync(socket);
+    Socket clientSocket = server.AcceptSocket(); // wait for client
+                                                 // Handle each client in a separate task
+    _ = Task.Run(() => HandleClient(clientSocket));
 }
 
-async Task HandleSocketAsync(Socket socket)
+static async Task HandleClient(Socket clientSocket)
 {
-    while (socket.Connected)
+    try
     {
-        byte[] requestData = new byte[socket.ReceiveBufferSize];
-        await socket.ReceiveAsync(requestData);
-        RespData request = new RespData(RespDataType.String, "PING");
-        RespData response;
-        switch (request.Content)
+        while (true) // Keep connection alive
         {
-            case "PING":
-                response = new RespData(RespDataType.String, "PONG");
+            byte[] buffer = new byte[1024];
+            int bytesRead = await Task.Run(() => clientSocket.Receive(buffer));
+            if (bytesRead == 0) // Client disconnected
+            {
                 break;
-            default:
-                response = new RespData(RespDataType.Error, "Ocurrio un error");
-                break;
+            }
+            Console.WriteLine("Received data: " +
+                              System.Text.Encoding.ASCII.GetString(buffer));
+            string response = "+PONG\r\n";
+            byte[] responseBytes = System.Text.Encoding.ASCII.GetBytes(response);
+            await Task.Run(() => clientSocket.Send(responseBytes));
         }
-        await socket.SendAsync(response.GetRespStringInBytes());
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error handling client: {ex.Message}");
+    }
+    finally
+    {
+        clientSocket.Close();
     }
 }
