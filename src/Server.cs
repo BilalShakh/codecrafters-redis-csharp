@@ -28,9 +28,24 @@ static async Task HandleClient(Socket clientSocket)
             {
                 break;
             }
-            Console.WriteLine("Received data: " +
-                              System.Text.Encoding.ASCII.GetString(buffer));
-            string response = "+PONG\r\n";
+            string receivedData = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
+            Console.WriteLine("Received data: " + receivedData);
+
+            string response;
+            if (receivedData.StartsWith("PING", StringComparison.OrdinalIgnoreCase))
+            {
+                response = "+PONG\r\n";
+            }
+            else if (receivedData.StartsWith("ECHO", StringComparison.OrdinalIgnoreCase))
+            {
+                string echoMessage = receivedData.Substring(5); // Extract the message after "ECHO "
+                response = $"${echoMessage.Length}\r\n{echoMessage}\r\n";
+            }
+            else
+            {
+                response = "-ERR unknown command\r\n";
+            }
+
             byte[] responseBytes = System.Text.Encoding.ASCII.GetBytes(response);
             await Task.Run(() => clientSocket.Send(responseBytes));
         }
