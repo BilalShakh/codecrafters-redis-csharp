@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 Console.WriteLine("Logs from your program will appear here!");
@@ -28,25 +29,25 @@ static async Task HandleClient(Socket clientSocket)
             {
                 break;
             }
-            string receivedData = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
+            string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
+            var request = receivedData.Split("\r\n");
             Console.WriteLine("Received data: " + receivedData);
 
             string response;
-            if (receivedData.StartsWith("PING", StringComparison.OrdinalIgnoreCase))
+            if (request[2] == "PING")
             {
                 response = "+PONG\r\n";
             }
-            else if (receivedData.StartsWith("ECHO", StringComparison.OrdinalIgnoreCase))
+            else if (request[2] == "ECHO")
             {
-                string echoMessage = receivedData.Substring(5); // Extract the message after "ECHO "
-                response = $"${echoMessage.Length}\r\n{echoMessage}\r\n";
+                response = $"${request[4].Length}\r\n{request[4]}\r\n";
             }
             else
             {
                 response = "-ERR unknown command\r\n";
             }
 
-            byte[] responseBytes = System.Text.Encoding.ASCII.GetBytes(response);
+            byte[] responseBytes = Encoding.ASCII.GetBytes(response);
             await Task.Run(() => clientSocket.Send(responseBytes));
         }
     }
