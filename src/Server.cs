@@ -10,3 +10,4 @@ TcpListener server = new TcpListener(IPAddress.Any, 6379);
 server.Start();
 var clientSocket = server.AcceptSocket(); // wait for client
 clientSocket.SendAsync(Encoding.UTF8.GetBytes("+PONG\r\n"), SocketFlags.None);
+clientSocket.SendAsync(Encoding.UTF8.GetBytes("+PONG\r\n"), SocketFlags.None);
