@@ -60,7 +60,7 @@ async Task HandleClient(Socket clientSocket)
                 data.Add(request[4], request[6]);
                 if (request.Length > 7)
                 {
-                    if (request[9] == "px")
+                    if (request[8] == "px")
                     {
                         int timeToExpire = int.Parse(request[10]);
                         _ = HandleExpiry(timeToExpire, request[4]);
