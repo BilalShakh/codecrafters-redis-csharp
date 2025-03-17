@@ -10,6 +10,8 @@ Console.WriteLine("Logs from your program will appear here!");
 TcpListener server = new TcpListener(IPAddress.Any, 6379);
 server.Start();
 
+Dictionary<string, string> data = new Dictionary<string, string>();
+
 while (true) // Keep the server running
 {
     Socket clientSocket = server.AcceptSocket(); // wait for client
@@ -41,6 +43,22 @@ static async Task HandleClient(Socket clientSocket)
             else if (request[2] == "ECHO")
             {
                 response = $"${request[4].Length}\r\n{request[4]}\r\n";
+            }
+            else if (request[2] == "GET")
+            {
+                if (data.ContainsKey(request[4]))
+                {
+                    response = $"${data[request[4]].Length}\r\n{data[request[4]]}\r\n";
+                }
+                else
+                {
+                    response = "$-1\r\n";
+                }
+            }
+            else if (request[2] == "SET")
+            {
+                data.Add(request[4], request[6]);
+                response = "+OK\r\n";
             }
             else
             {
