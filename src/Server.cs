@@ -58,6 +58,14 @@ async Task HandleClient(Socket clientSocket)
             else if (request[2] == "SET")
             {
                 data.Add(request[4], request[6]);
+                if (request.Length > 7)
+                {
+                    if (request[9] == "px")
+                    {
+                        int timeToExpire = int.Parse(request[10]);
+                        _ = HandleExpiry(timeToExpire, request[4]);
+                    }
+                }
                 response = "+OK\r\n";
             }
             else
@@ -77,4 +85,10 @@ async Task HandleClient(Socket clientSocket)
     {
         clientSocket.Close();
     }
+}
+
+async Task HandleExpiry(int timeToExpire, string key)
+{
+    await Task.Delay(timeToExpire);
+    data.Remove(key);
 }
