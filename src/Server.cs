@@ -19,7 +19,7 @@ while (true) // Keep the server running
     _ = Task.Run(() => HandleClient(clientSocket));
 }
 
-static async Task HandleClient(Socket clientSocket)
+async Task HandleClient(Socket clientSocket)
 {
     try
     {
