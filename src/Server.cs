@@ -90,11 +90,11 @@ public class Server
                         {
                             if (request[6] == "dir")
                             {
-                                response = $"$*2\r\n$3\r\ndir\r\n{RDBFileDirectory.Length}\r\n{RDBFileDirectory}\r\n";
+                                response = $"*2\r\n$3\r\ndir\r\n{RDBFileDirectory.Length}\r\n{RDBFileDirectory}\r\n";
                             }
                             else
                             {
-                                response = $"$*2\r\n$10\r\ndbfilename\r\n{RDBFileName.Length}\r\n{RDBFileName}\r\n";
+                                response = $"*2\r\n$10\r\ndbfilename\r\n{RDBFileName.Length}\r\n{RDBFileName}\r\n";
                             }
                         }
                         break;
