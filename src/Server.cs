@@ -1,94 +1,128 @@
-using System.Collections;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-// You can use print statements as follows for debugging, they'll be visible when running tests.
-Console.WriteLine("Logs from your program will appear here!");
+namespace codecrafters_redis.src;
 
 // Uncomment this block to pass the first stage
-TcpListener server = new TcpListener(IPAddress.Any, 6379);
-server.Start();
-
-Dictionary<string, string> data = new Dictionary<string, string>();
-
-while (true) // Keep the server running
+public class Server
 {
-    Socket clientSocket = server.AcceptSocket(); // wait for client
-                                                 // Handle each client in a separate task
-    _ = Task.Run(() => HandleClient(clientSocket));
-}
-
-async Task HandleClient(Socket clientSocket)
-{
-    try
+    public static Dictionary<string, string> data = [];
+    public static string RDBFileDirectory = string.Empty;
+    public static string RDBFileName = string.Empty;
+    public static void Main(string[] args)
     {
-        while (true) // Keep connection alive
-        {
-            byte[] buffer = new byte[1024];
-            int bytesRead = await Task.Run(() => clientSocket.Receive(buffer));
-            if (bytesRead == 0) // Client disconnected
-            {
-                break;
-            }
-            string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
-            var request = receivedData.Split("\r\n");
-            Console.WriteLine("Received data: " + receivedData);
+        // You can use print statements as follows for debugging, they'll be visible when running tests.
+        Console.WriteLine("Logs from your program will appear here!");
 
-            string response;
-            if (request[2] == "PING")
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
             {
-                response = "+PONG\r\n";
+                case "--dir":
+                    if (i + 1 < args.Length)
+                        RDBFileDirectory = args[i + 1];
+                    break;
+                case "--dbfilename":
+                    if (i + 1 < args.Length)
+                        RDBFileName = args[i + 1];
+                    break;
             }
-            else if (request[2] == "ECHO")
+        }
+
+        TcpListener server = new TcpListener(IPAddress.Any, 6379);
+        server.Start();
+
+        while (true) // Keep the server running
+        {
+            Socket clientSocket = server.AcceptSocket(); // wait for client
+                                                         // Handle each client in a separate task
+            _ = Task.Run(() => HandleClient(clientSocket));
+        }
+    }
+
+    static async Task HandleClient(Socket clientSocket)
+    {
+        try
+        {
+            while (true) // Keep connection alive
             {
-                response = $"${request[4].Length}\r\n{request[4]}\r\n";
-            }
-            else if (request[2] == "GET")
-            {
-                if (data.ContainsKey(request[4]))
+                byte[] buffer = new byte[1024];
+                int bytesRead = await Task.Run(() => clientSocket.Receive(buffer));
+                if (bytesRead == 0) // Client disconnected
                 {
-                    response = $"${data[request[4]].Length}\r\n{data[request[4]]}\r\n";
+                    break;
+                }
+                string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
+                var request = receivedData.Split("\r\n");
+                Console.WriteLine("Received data: " + receivedData);
+
+                string response;
+                if (request[2] == "PING")
+                {
+                    response = "+PONG\r\n";
+                }
+                else if (request[2] == "ECHO")
+                {
+                    response = $"${request[4].Length}\r\n{request[4]}\r\n";
+                }
+                else if (request[2] == "GET")
+                {
+                    if (data.TryGetValue(request[4], out string? value))
+                    {
+                        response = $"${value.Length}\r\n{value}\r\n";
+                    }
+                    else if (request[4] == "dir" || request[4] == "dbfilename")
+                    {
+                        if (request[4] == "dir")
+                        {
+                            response = $"${RDBFileDirectory.Length}\r\n{RDBFileDirectory}\r\n";
+                        }
+                        else
+                        {
+                            response = $"${RDBFileName.Length}\r\n{RDBFileName}\r\n";
+                        }
+                    }
+                    else
+                    {
+                        response = "$-1\r\n";
+                    }
+                }
+                else if (request[2] == "SET")
+                {
+                    data.Add(request[4], request[6]);
+                    if (request.Length > 7)
+                    {
+                        if (request[8] == "px")
+                        {
+                            int timeToExpire = int.Parse(request[10]);
+                            _ = HandleExpiry(timeToExpire, request[4]);
+                        }
+                    }
+                    response = "+OK\r\n";
                 }
                 else
                 {
-                    response = "$-1\r\n";
+                    response = "-ERR unknown command\r\n";
                 }
-            }
-            else if (request[2] == "SET")
-            {
-                data.Add(request[4], request[6]);
-                if (request.Length > 7)
-                {
-                    if (request[8] == "px")
-                    {
-                        int timeToExpire = int.Parse(request[10]);
-                        _ = HandleExpiry(timeToExpire, request[4]);
-                    }
-                }
-                response = "+OK\r\n";
-            }
-            else
-            {
-                response = "-ERR unknown command\r\n";
-            }
 
-            byte[] responseBytes = Encoding.ASCII.GetBytes(response);
-            await Task.Run(() => clientSocket.Send(responseBytes));
+                byte[] responseBytes = Encoding.ASCII.GetBytes(response);
+                await Task.Run(() => clientSocket.Send(responseBytes));
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error handling client: {ex.Message}");
+        }
+        finally
+        {
+            clientSocket.Close();
         }
     }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error handling client: {ex.Message}");
-    }
-    finally
-    {
-        clientSocket.Close();
-    }
-}
 
-async Task HandleExpiry(int timeToExpire, string key)
-{
-    await Task.Delay(timeToExpire);
-    data.Remove(key);
+    static async Task HandleExpiry(int timeToExpire, string key)
+    {
+        await Task.Delay(timeToExpire);
+        data.Remove(key);
+    }
 }
