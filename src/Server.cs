@@ -57,53 +57,50 @@ public class Server
                 var request = receivedData.Split("\r\n");
                 Console.WriteLine("Received data: " + receivedData);
 
-                string response;
-                if (request[2] == "PING")
+                string response = string.Empty;
+                switch (request[2])
                 {
-                    response = "+PONG\r\n";
-                }
-                else if (request[2] == "ECHO")
-                {
-                    response = $"${request[4].Length}\r\n{request[4]}\r\n";
-                }
-                else if (request[2] == "GET")
-                {
-                    if (data.TryGetValue(request[4], out string? value))
-                    {
-                        response = $"${value.Length}\r\n{value}\r\n";
-                    }
-                    else if (request[4] == "dir" || request[4] == "dbfilename")
-                    {
-                        if (request[4] == "dir")
+                    case "PING":
+                        response = "+PONG\r\n";
+                        break;
+                    case "ECHO":
+                        response = $"${request[4].Length}\r\n{request[4]}\r\n";
+                        break;
+                    case "GET":
+                        if (data.TryGetValue(request[4], out string? value))
                         {
-                            response = $"${RDBFileDirectory.Length}\r\n{RDBFileDirectory}\r\n";
+                            response = $"${value.Length}\r\n{value}\r\n";
                         }
                         else
                         {
-                            response = $"${RDBFileName.Length}\r\n{RDBFileName}\r\n";
+                            response = "$-1\r\n";
                         }
-                    }
-                    else
-                    {
-                        response = "$-1\r\n";
-                    }
-                }
-                else if (request[2] == "SET")
-                {
-                    data.Add(request[4], request[6]);
-                    if (request.Length > 7)
-                    {
-                        if (request[8] == "px")
+                        break;
+                    case "SET":
+                        data.Add(request[4], request[6]);
+                        if (request.Length > 7 && request[8] == "px")
                         {
                             int timeToExpire = int.Parse(request[10]);
                             _ = HandleExpiry(timeToExpire, request[4]);
                         }
-                    }
-                    response = "+OK\r\n";
-                }
-                else
-                {
-                    response = "-ERR unknown command\r\n";
+                        response = "+OK\r\n";
+                        break;
+                    case "CONFIG":
+                        if (request[6] == "dir" || request[6] == "dbfilename")
+                        {
+                            if (request[6] == "dir")
+                            {
+                                response = $"${RDBFileDirectory.Length}\r\n{RDBFileDirectory}\r\n";
+                            }
+                            else
+                            {
+                                response = $"${RDBFileName.Length}\r\n{RDBFileName}\r\n";
+                            }
+                        }
+                        break;
+                    default:
+                        response = "-ERR unknown command\r\n";
+                        break;
                 }
 
                 byte[] responseBytes = Encoding.ASCII.GetBytes(response);
