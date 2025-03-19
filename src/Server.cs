@@ -7,7 +7,7 @@ namespace codecrafters_redis.src;
 // Uncomment this block to pass the first stage
 public class Server
 {
-    public static Dictionary<string, string> data = [];
+    public static Dictionary<string, string> dataStore = [];
     public static string RDBFileDirectory = string.Empty;
     public static string RDBFileName = string.Empty;
     public static void Main(string[] args)
@@ -30,6 +30,7 @@ public class Server
             }
         }
 
+        LoadContents();
         TcpListener server = new TcpListener(IPAddress.Any, 6379);
         server.Start();
 
@@ -39,6 +40,111 @@ public class Server
                                                          // Handle each client in a separate task
             _ = Task.Run(() => HandleClient(clientSocket));
         }
+    }
+
+    static void LoadContents()
+    {
+        string filePath = Path.Combine(RDBFileDirectory, RDBFileName);
+        if (!File.Exists(filePath))
+        {
+            Console.WriteLine($"File {filePath} does not exist!");
+            return;
+        }
+        try
+        {
+            byte[] data = File.ReadAllBytes(filePath);
+            Console.WriteLine(
+                $"File read successfully. Data (hex): {BitConverter.ToString(data)}");
+            dataStore = ParseRedisRdbData(data);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"An error occurred while loading contents: {ex.Message}");
+        }
+    }
+
+    static Dictionary<string, string> ParseRedisRdbData(byte[] data)
+    {
+        Dictionary<string, string> keyValuePairs = new();
+        int index = 0;
+        try
+        {
+            while (index < data.Length)
+            {
+                if (data[index] == 0xFB) // Start of database section
+                {
+                    index = ParseDatabaseSection(data, index, keyValuePairs);
+                }
+                else
+                {
+                    index++; // Skip unknown or unhandled sections
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error parsing RDB data: {ex.Message}");
+            throw;
+        }
+        return keyValuePairs;
+    }
+    
+    static int ParseDatabaseSection(byte[] data, int startIndex,
+                                     Dictionary<string, string> keyValuePairs)
+    {
+        int index = startIndex + 1;
+        int length = data[index] + data[index + 1];
+        Console.WriteLine(
+            $"Database section detected. Key-value count: {length}");
+        index += 2;
+        if (data[index] != 0x00)
+        {
+            throw new InvalidOperationException(
+                "Non-string types are not supported yet.");
+        }
+        index++;
+        for (int i = 0; i < length; i++)
+        {
+            if (data[index] == 0xFC)
+            {
+                Console.WriteLine("Skipping expiry information.");
+                index += 10; // Skip FC + 8-byte unsigned long + 0x00
+            }
+            // Parse key
+            int keyLength = data[index];
+            Console.WriteLine($"Key length: {keyLength}");
+            index++;
+            string key = ParseString(data, ref index, keyLength);
+            Console.WriteLine($"Parsed key: {key}");
+            // Parse value
+            int valueLength = data[index];
+            Console.WriteLine($"Value length: {valueLength}");
+            index++;
+            string value = ParseString(data, ref index, valueLength);
+            Console.WriteLine($"Parsed value: {value}");
+            keyValuePairs.Add(key, value);
+            Console.WriteLine($"Key-Value pair added: {key} => {value}");
+        }
+        return index;
+    }
+    
+    static string ParseString(byte[] data, ref int index, int length)
+    {
+        string result =
+            Encoding.Default.GetString(data.Skip(index).Take(length).ToArray());
+        index += length;
+        return result;
+    }
+
+    static string buildArrayString(string[] args)
+    {
+        var answer = string.Format("*{0}\r\n", args.Length);
+        foreach (var item in args)
+        {
+            answer += string.Format("${0}\r\n{1}\r\n", item.Length, item);
+        }
+        return answer;
     }
 
     static async Task HandleClient(Socket clientSocket)
@@ -67,7 +173,7 @@ public class Server
                         response = $"${request[4].Length}\r\n{request[4]}\r\n";
                         break;
                     case "GET":
-                        if (data.TryGetValue(request[4], out string? value))
+                        if (dataStore.TryGetValue(request[4], out string? value))
                         {
                             response = $"${value.Length}\r\n{value}\r\n";
                         }
@@ -77,7 +183,7 @@ public class Server
                         }
                         break;
                     case "SET":
-                        data.Add(request[4], request[6]);
+                        dataStore.Add(request[4], request[6]);
                         if (request.Length > 7 && request[8] == "px")
                         {
                             int timeToExpire = int.Parse(request[10]);
@@ -97,6 +203,11 @@ public class Server
                                 response = $"*2\r\n$10\r\ndbfilename\r\n${RDBFileName.Length}\r\n{RDBFileName}\r\n";
                             }
                         }
+                        break;
+                    case "KEYS":
+                        string pattern = request[4];
+                        var keys = dataStore.Keys.Where(k => k.Contains(pattern) || pattern == "*").ToArray();
+                        response = buildArrayString(keys);
                         break;
                     default:
                         response = "-ERR unknown command\r\n";
@@ -120,6 +231,6 @@ public class Server
     static async Task HandleExpiry(int timeToExpire, string key)
     {
         await Task.Delay(timeToExpire);
-        data.Remove(key);
+        dataStore.Remove(key);
     }
 }
