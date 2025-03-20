@@ -306,8 +306,10 @@ public class Server
         {
             delay = (int)(unixTimeStamp - DateTimeOffset.Now.ToUnixTimeMilliseconds());
         }
+        Console.WriteLine($"Delay: {delay}");
         if (delay < 0)
         {
+            Console.WriteLine("Expiry time has already passed. Removing key.");
             dataStore.Remove(key);
             return;
         }
