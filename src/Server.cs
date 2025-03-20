@@ -101,7 +101,7 @@ public class Server
         if (data[index] != 0x00)
         {
             throw new InvalidOperationException(
-                "Non-string types are not supported yet.");
+                $"Non-string types are not supported yet. Type: {data[index]}");
         }
         index++;
         for (int i = 0; i < length; i++)
