@@ -147,10 +147,12 @@ public class Server
             if (expiryTimeStampFC != 0)
             {
                 _ = HandleTimeStampExpiry(expiryTimeStampFC, key, false);
+                expiryTimeStampFC = 0;
             }
             else if (expiryTimeStampFD != 0)
             {
                 _ = HandleTimeStampExpiry(expiryTimeStampFD, key, true);
+                expiryTimeStampFD = 0;
             }
         }
         return index;
