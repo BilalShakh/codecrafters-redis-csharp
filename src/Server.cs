@@ -100,18 +100,18 @@ public class Server
         index += 2;
         for (int i = 0; i < length; i++)
         {
-            long expiryTimeStampFC = 0;
-            int expiryTimeStampFD = 0;
+            ulong expiryTimeStampFC = 0;
+            uint expiryTimeStampFD = 0;
             if (data[index] == 0xFC)
             {
                 index++;
-                expiryTimeStampFC = ExtractInt64(data, ref index);
+                expiryTimeStampFC = ExtractUInt64(data, ref index);
                 Console.WriteLine($"Extracted expiry information. Milliseconds information. Timestamp:{expiryTimeStampFC}");
             }
             if (data[index] == 0xFD)
             {
                 index++;
-                expiryTimeStampFD = ExtractInt32(data, ref index);
+                expiryTimeStampFD = ExtractUInt32(data, ref index);
                 Console.WriteLine($"Extracted expiry information. Seconds information. Timestamp:{expiryTimeStampFD}");
             }
             if (data[index] == 0x00)
@@ -151,7 +151,7 @@ public class Server
             Console.WriteLine($"Key-Value pair added: {key} => {value}");
             if (expiryTimeStampFC != 0)
             {
-                _ = HandleTimeStampExpiry(expiryTimeStampFC, key, false);
+                _ = HandleTimeStampExpiry((long)expiryTimeStampFC, key, false);
                 expiryTimeStampFC = 0;
             }
             else if (expiryTimeStampFD != 0)
@@ -171,24 +171,24 @@ public class Server
         return result;
     }
 
-    static long ExtractInt64(byte[] data, ref int index)
+    static ulong ExtractUInt64(byte[] data, ref int index)
     {
         if (index + 8 >= data.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(index), "Index out of range for extracting UInt64.");
         }
-        long value = BitConverter.ToInt64(data, index);
+        ulong value = BitConverter.ToUInt64(data, index);
         index += 8;
         return value;
     }
 
-    static int ExtractInt32(byte[] data, ref int index)
+    static uint ExtractUInt32(byte[] data, ref int index)
     {
         if (index + 4 >= data.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(index), "Index out of range for extracting UInt32.");
         }
-        int value = BitConverter.ToInt32(data, index);
+        uint value = BitConverter.ToUInt32(data, index);
         index += 4;
         return value;
     }
