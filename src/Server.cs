@@ -75,6 +75,11 @@ public class Server
                 if (data[index] == 0xFB) // Start of database section
                 {
                     index = ParseDatabaseSection(data, index, keyValuePairs);
+                    if (data[index] == 0xFF)
+                    {
+                        Console.WriteLine("End of database section detected.");
+                        break;
+                    }
                 }
                 else
                 {
