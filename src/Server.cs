@@ -106,15 +106,17 @@ public class Server
         index++;
         for (int i = 0; i < length; i++)
         {
+            long expiryTimeStampFC = 0;
+            int expiryTimeStampFD = 0;
             if (data[index] == 0xFC)
             {
-                Console.WriteLine("Skipping expiry information. Milliseconds information.");
-                index += 10; // Skip FC + 8-byte unsigned long + 0x00
+                expiryTimeStampFC = ExtractInt64(data, ref index);
+                Console.WriteLine($"Extracted expiry information. Milliseconds information. Timestamp:{expiryTimeStampFC}");
             }
             if (data[index] == 0xFD)
             {
-                Console.WriteLine("Skipping expiry information. Seconds information.");
-                index += 6; // Skip FD + 4-byte unsigned int + 0x00
+                expiryTimeStampFD = ExtractInt32(data, ref index);
+                Console.WriteLine($"Extracted expiry information. Seconds information. Timestamp:{expiryTimeStampFD}");
             }
             if (data[index] == 0x00)
             {
@@ -146,6 +148,14 @@ public class Server
             }
             keyValuePairs.Add(key, value);
             Console.WriteLine($"Key-Value pair added: {key} => {value}");
+            if (expiryTimeStampFC != 0)
+            {
+                _ = HandleTimeStampExpiry(expiryTimeStampFC, key, false);
+            }
+            else if (expiryTimeStampFD != 0)
+            {
+                _ = HandleTimeStampExpiry(expiryTimeStampFD, key, true);
+            }
         }
         return index;
     }
@@ -156,6 +166,28 @@ public class Server
             Encoding.Default.GetString(data.Skip(index).Take(length).ToArray());
         index += length;
         return result;
+    }
+
+    static long ExtractInt64(byte[] data, ref int index)
+    {
+        if (index + 8 >= data.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index), "Index out of range for extracting UInt64.");
+        }
+        long value = BitConverter.ToInt64(data, index);
+        index += 8;
+        return value;
+    }
+
+    static int ExtractInt32(byte[] data, ref int index)
+    {
+        if (index + 4 >= data.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index), "Index out of range for extracting UInt32.");
+        }
+        int value = BitConverter.ToInt32(data, index);
+        index += 4;
+        return value;
     }
 
     static string BuildArrayString(string[] args)
@@ -254,4 +286,17 @@ public class Server
         await Task.Delay(timeToExpire);
         dataStore.Remove(key);
     }
-}
+
+    static async Task HandleTimeStampExpiry(long unixTimeStamp, string key, bool isSeconds)
+    {
+        if (isSeconds)
+        {
+            await Task.Delay((int)(unixTimeStamp - DateTimeOffset.Now.ToUnixTimeSeconds()) * 1000);
+        }
+        else
+        {
+            await Task.Delay((int)(unixTimeStamp - DateTimeOffset.Now.ToUnixTimeMilliseconds()));
+        }
+        dataStore.Remove(key);
+    }
+ }
