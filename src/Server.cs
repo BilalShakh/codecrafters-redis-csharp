@@ -55,7 +55,7 @@ public class Server
             byte[] data = File.ReadAllBytes(filePath);
             Console.WriteLine(
                 $"File read successfully. Data (hex): {BitConverter.ToString(data)}");
-            dataStore = ParseRedisRdbData(data);
+            ParseRedisRdbData(data);
         }
         catch (Exception ex)
         {
@@ -64,9 +64,8 @@ public class Server
         }
     }
 
-    static Dictionary<string, string> ParseRedisRdbData(byte[] data)
+    static void ParseRedisRdbData(byte[] data)
     {
-        Dictionary<string, string> keyValuePairs = [];
         int index = 0;
         try
         {
@@ -74,7 +73,7 @@ public class Server
             {
                 if (data[index] == 0xFB) // Start of database section
                 {
-                    index = ParseDatabaseSection(data, index, keyValuePairs);
+                    index = ParseDatabaseSection(data, index);
                     if (data[index] == 0xFF)
                     {
                         Console.WriteLine("End of database section detected.");
@@ -92,11 +91,9 @@ public class Server
             Console.WriteLine($"Error parsing RDB data: {ex.Message}");
             throw;
         }
-        return keyValuePairs;
     }
     
-    static int ParseDatabaseSection(byte[] data, int startIndex,
-                                     Dictionary<string, string> keyValuePairs)
+    static int ParseDatabaseSection(byte[] data, int startIndex)
     {
         int index = startIndex + 1;
         int length = data[index] + data[index + 1];
@@ -146,13 +143,13 @@ public class Server
                 Console.WriteLine("Empty key found. Skipping.");
                 continue;
             }
-            if (keyValuePairs.ContainsKey(key))
+            if (dataStore.ContainsKey(key))
             {
-                keyValuePairs[key] = value;
+                dataStore[key] = value;
                 Console.WriteLine($"Key-Value pair updated: {key} => {value}");
                 continue;
             }
-            keyValuePairs.Add(key, value);
+            dataStore.Add(key, value);
             Console.WriteLine($"Key-Value pair added: {key} => {value}");
             if (expiryTimeStampFC != 0)
             {
