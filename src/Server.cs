@@ -7,9 +7,9 @@ namespace codecrafters_redis.src;
 // Uncomment this block to pass the first stage
 public class Server
 {
-    private static Dictionary<string, string> dataStore = [];
-    private static string RDBFileDirectory = string.Empty;
-    private static string RDBFileName = string.Empty;
+    public static Dictionary<string, string> dataStore = [];
+    public static string RDBFileDirectory = string.Empty;
+    public static string RDBFileName = string.Empty;
     public static void Main(string[] args)
     {
         // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -30,7 +30,7 @@ public class Server
             }
         }
 
-        LoadRdbFile(Path.Combine(RDBFileDirectory, RDBFileName));
+        LoadContents();
         TcpListener server = new TcpListener(IPAddress.Any, 6379);
         server.Start();
 
@@ -42,122 +42,110 @@ public class Server
         }
     }
 
-    private static void LoadRdbFile(string path)
+    static void LoadContents()
     {
+        string filePath = Path.Combine(RDBFileDirectory, RDBFileName);
+        if (!File.Exists(filePath))
+        {
+            Console.WriteLine($"File {filePath} does not exist!");
+            return;
+        }
         try
         {
-            byte[] rdbData = File.ReadAllBytes(path);
-            Console.WriteLine("RDB Data: " + rdbData.Length);
-            // Check REDIS magic string and version
-            if (rdbData.Length < 9 ||
-                Encoding.ASCII.GetString(rdbData, 0, 5) != "REDIS")
+            byte[] data = File.ReadAllBytes(filePath);
+            Console.WriteLine(
+                $"File read successfully. Data (hex): {BitConverter.ToString(data)}");
+            dataStore = ParseRedisRdbData(data);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"An error occurred while loading contents: {ex.Message}");
+        }
+    }
+
+    static Dictionary<string, string> ParseRedisRdbData(byte[] data)
+    {
+        Dictionary<string, string> keyValuePairs = [];
+        int index = 0;
+        try
+        {
+            while (index < data.Length)
             {
-                Console.WriteLine("Invalid RDB file format");
-                return;
-            }
-            // Skip the REDIS version (next 4 bytes after REDIS)
-            int position = 9;
-            while (position < rdbData.Length)
-            {
-                byte opcode = rdbData[position];
-                position++;
-                if (opcode == 0xFF) // EOF
+                if (data[index] == 0xFB) // Start of database section
                 {
-                    break;
+                    index = ParseDatabaseSection(data, index, keyValuePairs);
                 }
-                if (opcode == 0xFA) // Auxiliary field
+                else
                 {
-                    // Skip auxiliary field
-                    string? auxKey = ReadString(rdbData, ref position);
-                    string? auxValue = ReadString(rdbData, ref position);
-                    continue;
-                }
-                if (opcode == 0xFE) // Database Selector
-                {
-                    position++; // Skip the database number
-                    continue;
-                }
-                // Handle regular key-value pair (no expiry)
-                if (opcode == 0xFB) // Hash table sizes
-                {
-                    // Read total hash table size
-                    int totalSize = ReadLength(rdbData, ref position);
-                    Console.WriteLine($"Total hash table size: {totalSize}");
-                    // Read expiry hash table size
-                    int expirySize = ReadLength(rdbData, ref position);
-                    Console.WriteLine($"Expiry hash table size: {expirySize}");
-                    // Now read the key-value pairs
-                    for (int i = 0; i < totalSize; i++)
-                    {
-                        byte keyType = rdbData[position];
-                        position++;
-                        Console.WriteLine($"Key type: 0x{keyType:X2}");
-                        string? key = ReadString(rdbData, ref position);
-                        string? value = ReadString(rdbData, ref position);
-                        Console.WriteLine("Key: " + key);
-                        Console.WriteLine("Value: " + value);
-                        if (key != null && value != null)
-                        {
-                            if (dataStore.ContainsKey(key))
-                            {
-                                dataStore[key] = value;
-                                Console.WriteLine($"Loaded key: {key} with value: {value}");
-                                continue;
-                            }
-                            dataStore.Add(key, value);
-                            Console.WriteLine($"Loaded key: {key} with value: {value}");
-                        }
-                    }
+                    index++; // Skip unknown or unhandled sections
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading RDB file: {ex.Message}");
+            Console.WriteLine($"Error parsing RDB data: {ex.Message}");
+            throw;
         }
+        return keyValuePairs;
     }
-    private static int ReadLength(byte[] data, ref int position)
+    
+    static int ParseDatabaseSection(byte[] data, int startIndex,
+                                     Dictionary<string, string> keyValuePairs)
     {
-        if (position >= data.Length)
-            return -1;
-        byte firstByte = data[position];
-        position++;
-        // Check for special format
-        if ((firstByte & 0xC0) == 0) // Length is encoded in the first 6 bits
+        int index = startIndex + 1;
+        int length = data[index] + data[index + 1];
+        Console.WriteLine(
+            $"Database section detected. Key-value count: {length}");
+        index += 2;
+        if (data[index] != 0x00)
         {
-            return firstByte;
+            throw new InvalidOperationException(
+                "Non-string types are not supported yet.");
         }
-        else if ((firstByte & 0xE0) == 0xC0) // 110xxxxx - 13 bit number
+        index++;
+        for (int i = 0; i < length; i++)
         {
-            if (position >= data.Length)
-                return -1;
-            int next = data[position];
-            position++;
-            return ((firstByte & 0x1F) << 8) | next;
-        }
-        else if ((firstByte & 0xF0) == 0xE0) // 1110xxxx - 32 bit number
-        {
-            if (position + 4 > data.Length)
-                return -1;
-            int value = 0;
-            for (int i = 0; i < 4; i++)
+            if (data[index] == 0xFC)
             {
-                value = (value << 8) | data[position + i];
+                Console.WriteLine("Skipping expiry information.");
+                index += 10; // Skip FC + 8-byte unsigned long + 0x00
             }
-            position += 4;
-            return value;
+            // Parse key
+            int keyLength = data[index];
+            Console.WriteLine($"Key length: {keyLength}");
+            index++;
+            string key = ParseString(data, ref index, keyLength);
+            Console.WriteLine($"Parsed key: {key}");
+            // Parse value
+            int valueLength = data[index];
+            Console.WriteLine($"Value length: {valueLength}");
+            index++;
+            string value = ParseString(data, ref index, valueLength);
+            Console.WriteLine($"Parsed value: {value}");
+            if (key.Length == 0)
+            {
+                Console.WriteLine("Empty key found. Skipping.");
+                continue;
+            }
+            if (keyValuePairs.ContainsKey(key))
+            {
+                keyValuePairs[key] = value;
+                Console.WriteLine($"Key-Value pair updated: {key} => {value}");
+                continue;
+            }
+            keyValuePairs.Add(key, value);
+            Console.WriteLine($"Key-Value pair added: {key} => {value}");
         }
-        return -1; // Invalid length encoding
+        return index;
     }
-    private static string? ReadString(byte[] data, ref int position)
+    
+    static string ParseString(byte[] data, ref int index, int length)
     {
-        // First read and skip the value type byte
-        int length = ReadLength(data, ref position);
-        if (length < 0 || position + length > data.Length)
-            return null;
-        string str = Encoding.ASCII.GetString(data, position, length);
-        position += length;
-        return str;
+        string result =
+            Encoding.Default.GetString(data.Skip(index).Take(length).ToArray());
+        index += length;
+        return result;
     }
 
     static string BuildArrayString(string[] args)
