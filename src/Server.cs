@@ -294,22 +294,15 @@ public class Server
 
     static async Task HandleTimeStampExpiry(long unixTimeStamp, string key, bool isSeconds)
     {
-        int delay = 0;
-        if (isSeconds)
+        long currentUnixTime = isSeconds ? DateTimeOffset.UtcNow.ToUnixTimeSeconds() : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        long delay = unixTimeStamp - currentUnixTime;
+        Console.WriteLine($"key: {key} Delay: {delay} unixTimeStamp: {unixTimeStamp} Now: {currentUnixTime}");
+        if (delay <= 0)
         {
-            delay = (int)(unixTimeStamp - DateTimeOffset.Now.ToUnixTimeSeconds()) * 1000;
-        }
-        else
-        {
-            delay = (int)(unixTimeStamp - DateTimeOffset.Now.ToUnixTimeMilliseconds());
-        }
-        Console.WriteLine($"key:{key} Delay: {delay} unixTimeStamp:{unixTimeStamp} Now.ToUnixTimeMilliseconds:{DateTimeOffset.Now.ToUnixTimeMilliseconds()} Now.ToUnixTimeSeconds:{DateTimeOffset.Now.ToUnixTimeSeconds()}");
-        if (delay < 0)
-        {
-            Console.WriteLine($"Expiry time has already passed. Removing key. Done:{dataStore.Remove(key)}");
+            Console.WriteLine($"Expiry time has already passed. Removing key. Done: {dataStore.Remove(key)}");
             return;
         }
-        await Task.Delay(delay);
+        await Task.Delay((int)delay);
         dataStore.Remove(key);
     }
- }
+}
