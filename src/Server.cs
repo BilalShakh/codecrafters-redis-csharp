@@ -98,12 +98,6 @@ public class Server
         Console.WriteLine(
             $"Database section detected. Key-value count: {length}");
         index += 2;
-        if (data[index] != 0x00)
-        {
-            throw new InvalidOperationException(
-                $"Non-string types are not supported yet. Type: {data[index]}");
-        }
-        index++;
         for (int i = 0; i < length; i++)
         {
             long expiryTimeStampFC = 0;
