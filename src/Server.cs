@@ -123,6 +123,12 @@ public class Server
             index++;
             string value = ParseString(data, ref index, valueLength);
             Console.WriteLine($"Parsed value: {value}");
+            if (keyValuePairs.ContainsKey(key))
+            {
+                keyValuePairs[key] = value;
+                Console.WriteLine($"Key-Value pair updated: {key} => {value}");
+                continue;
+            }
             keyValuePairs.Add(key, value);
             Console.WriteLine($"Key-Value pair added: {key} => {value}");
         }
