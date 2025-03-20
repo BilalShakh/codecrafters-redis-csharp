@@ -306,8 +306,7 @@ public class Server
         Console.WriteLine($"Delay: {delay} unixTimeStamp:{unixTimeStamp} Now.ToUnixTimeMilliseconds:{DateTimeOffset.Now.ToUnixTimeMilliseconds()} Now.ToUnixTimeSeconds:{DateTimeOffset.Now.ToUnixTimeSeconds()}");
         if (delay < 0)
         {
-            Console.WriteLine("Expiry time has already passed. Removing key.");
-            dataStore.Remove(key);
+            Console.WriteLine($"Expiry time has already passed. Removing key. Done:{dataStore.Remove(key)}");
             return;
         }
         await Task.Delay(delay);
