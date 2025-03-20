@@ -123,6 +123,11 @@ public class Server
             index++;
             string value = ParseString(data, ref index, valueLength);
             Console.WriteLine($"Parsed value: {value}");
+            if (key.Length == 0)
+            {
+                Console.WriteLine("Empty key found. Skipping.");
+                continue;
+            }
             if (keyValuePairs.ContainsKey(key))
             {
                 keyValuePairs[key] = value;
