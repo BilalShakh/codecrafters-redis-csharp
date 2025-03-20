@@ -104,11 +104,13 @@ public class Server
             int expiryTimeStampFD = 0;
             if (data[index] == 0xFC)
             {
+                index++;
                 expiryTimeStampFC = ExtractInt64(data, ref index);
                 Console.WriteLine($"Extracted expiry information. Milliseconds information. Timestamp:{expiryTimeStampFC}");
             }
             if (data[index] == 0xFD)
             {
+                index++;
                 expiryTimeStampFD = ExtractInt32(data, ref index);
                 Console.WriteLine($"Extracted expiry information. Seconds information. Timestamp:{expiryTimeStampFD}");
             }
