@@ -116,6 +116,11 @@ public class Server
                 Console.WriteLine("Skipping expiry information. Seconds information.");
                 index += 6; // Skip FD + 4-byte unsigned int + 0x00
             }
+            if (data[index] == 0x00)
+            {
+                index++;
+                Console.WriteLine("Skipping 0x00 byte.");
+            }
             // Parse key
             int keyLength = data[index];
             Console.WriteLine($"Key length: {keyLength}");
