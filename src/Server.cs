@@ -119,6 +119,11 @@ public class Server
                 index++;
                 Console.WriteLine("Skipping 0x00 byte.");
             }
+            if (data[index] == 0xFF)
+            {
+                Console.WriteLine("End of database section detected.");
+                break;
+            }
             // Parse key
             int keyLength = data[index];
             Console.WriteLine($"Key length: {keyLength}");
