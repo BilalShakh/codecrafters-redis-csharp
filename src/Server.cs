@@ -108,8 +108,13 @@ public class Server
         {
             if (data[index] == 0xFC)
             {
-                Console.WriteLine("Skipping expiry information.");
+                Console.WriteLine("Skipping expiry information. Milliseconds information.");
                 index += 10; // Skip FC + 8-byte unsigned long + 0x00
+            }
+            if (data[index] == 0xFD)
+            {
+                Console.WriteLine("Skipping expiry information. Seconds information.");
+                index += 6; // Skip FD + 4-byte unsigned int + 0x00
             }
             // Parse key
             int keyLength = data[index];
