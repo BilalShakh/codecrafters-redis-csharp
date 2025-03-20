@@ -292,14 +292,21 @@ public class Server
 
     static async Task HandleTimeStampExpiry(long unixTimeStamp, string key, bool isSeconds)
     {
+        int delay = 0;
         if (isSeconds)
         {
-            await Task.Delay((int)(unixTimeStamp - DateTimeOffset.Now.ToUnixTimeSeconds()) * 1000);
+            delay = (int)(unixTimeStamp - DateTimeOffset.Now.ToUnixTimeSeconds()) * 1000;
         }
         else
         {
-            await Task.Delay((int)(unixTimeStamp - DateTimeOffset.Now.ToUnixTimeMilliseconds()));
+            delay = (int)(unixTimeStamp - DateTimeOffset.Now.ToUnixTimeMilliseconds());
         }
+        if (delay < 0)
+        {
+            dataStore.Remove(key);
+            return;
+        }
+        await Task.Delay(delay);
         dataStore.Remove(key);
     }
  }
