@@ -66,7 +66,7 @@ public class Server
 
     static Dictionary<string, string> ParseRedisRdbData(byte[] data)
     {
-        Dictionary<string, string> keyValuePairs = new();
+        Dictionary<string, string> keyValuePairs = [];
         int index = 0;
         try
         {
@@ -137,7 +137,7 @@ public class Server
         return result;
     }
 
-    static string buildArrayString(string[] args)
+    static string BuildArrayString(string[] args)
     {
         var answer = string.Format("*{0}\r\n", args.Length);
         foreach (var item in args)
@@ -207,7 +207,7 @@ public class Server
                     case "KEYS":
                         string pattern = request[4];
                         var keys = dataStore.Keys.Where(k => k.Contains(pattern) || pattern == "*").ToArray();
-                        response = buildArrayString(keys);
+                        response = BuildArrayString(keys);
                         break;
                     default:
                         response = "-ERR unknown command\r\n";
