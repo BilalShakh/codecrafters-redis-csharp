@@ -35,7 +35,7 @@ public class Server
                         port = int.Parse(args[i + 1]);
                     break;
                 case "--replicaof":
-                    if (i + 2 < args.Length)
+                    if (i + 1 < args.Length)
                     {
                         string[] argumentParts = args[i + 1].Split(' ');
                         MasterHost = argumentParts[0];
