@@ -13,11 +13,33 @@ public class Server
     private static int port = 6379;
     private static string MasterHost = string.Empty;
     private static int MasterPort = 0;
+    private static string MasterReplicationId = string.Empty;
+    private static int MasterReplicationOffset = 0;
+
     public static void Main(string[] args)
     {
         // You can use print statements as follows for debugging, they'll be visible when running tests.
         Console.WriteLine("Logs from your program will appear here!");
 
+        LoadUpArgs(args);
+        if (MasterHost == string.Empty)
+        {
+            MasterReplicationId = Generate40CharacterGuid();
+        }
+        LoadContents();
+        TcpListener server = new TcpListener(IPAddress.Any, port);
+        server.Start();
+
+        while (true) // Keep the server running
+        {
+            Socket clientSocket = server.AcceptSocket(); // wait for client
+                                                         // Handle each client in a separate task
+            _ = Task.Run(() => HandleClient(clientSocket));
+        }
+    }
+
+    static void LoadUpArgs(string[] args)
+    {
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -43,17 +65,6 @@ public class Server
                     }
                     break;
             }
-        }
-
-        LoadContents();
-        TcpListener server = new TcpListener(IPAddress.Any, port);
-        server.Start();
-
-        while (true) // Keep the server running
-        {
-            Socket clientSocket = server.AcceptSocket(); // wait for client
-                                                         // Handle each client in a separate task
-            _ = Task.Run(() => HandleClient(clientSocket));
         }
     }
 
@@ -229,6 +240,13 @@ public class Server
         return $"${value.Length}\r\n{value}\r\n";
     }
 
+    private static string Generate40CharacterGuid()
+    {
+        string guid = Guid.NewGuid().ToString("N"); // 32 characters
+        string extraChars = Guid.NewGuid().ToString("N").Substring(0, 8); // 8 additional characters
+        return guid + extraChars; // 40 characters in total
+    }
+
     static async Task HandleClient(Socket clientSocket)
     {
         try
@@ -299,7 +317,9 @@ public class Server
                         }
                         else
                         {
-                            response = BuildBulkString("role:master");
+                            response = BuildArrayString([ "role:master", 
+                                "master_replid:" + MasterReplicationId, 
+                                "master_repl_offset:"+ MasterReplicationOffset.ToString()]);
                         }
                         break;
                     default:
