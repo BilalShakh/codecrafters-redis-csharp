@@ -7,10 +7,12 @@ namespace codecrafters_redis.src;
 // Uncomment this block to pass the first stage
 public class Server
 {
-    public static Dictionary<string, string> dataStore = [];
-    public static string RDBFileDirectory = string.Empty;
-    public static string RDBFileName = string.Empty;
-    public static int port = 6379;
+    private static readonly Dictionary<string, string> dataStore = [];
+    private static string RDBFileDirectory = string.Empty;
+    private static string RDBFileName = string.Empty;
+    private static int port = 6379;
+    private static string MasterHost = string.Empty;
+    private static int MasterPort = 0;
     public static void Main(string[] args)
     {
         // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -31,6 +33,14 @@ public class Server
                 case "--port":
                     if (i + 1 < args.Length)
                         port = int.Parse(args[i + 1]);
+                    break;
+                case "--replicaof":
+                    if (i + 2 < args.Length)
+                    {
+                        string[] argumentParts = args[i + 1].Split(' ');
+                        MasterHost = argumentParts[0];
+                        MasterPort = int.Parse(argumentParts[1]);
+                    }
                     break;
             }
         }
@@ -282,7 +292,15 @@ public class Server
                         response = BuildArrayString(keys);
                         break;
                     case "INFO":
-                        response = BuildBulkString("role:master");
+                        if (MasterHost != string.Empty)
+                        {
+                            Console.WriteLine($"MasterHost:{MasterHost} MasterPort:{MasterPort}");
+                            response = BuildBulkString($"role:slave");
+                        }
+                        else
+                        {
+                            response = BuildBulkString("role:master");
+                        }
                         break;
                     default:
                         response = "-ERR unknown command\r\n";
