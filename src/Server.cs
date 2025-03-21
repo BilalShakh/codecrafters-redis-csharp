@@ -235,9 +235,14 @@ public class Server
         return answer;
     }
 
-    static string BuildBulkString(string value)
+    static string BuildBulkString(string[] values)
     {
-        return $"${value.Length}\r\n{value}\r\n";
+        string response = string.Empty;
+        foreach (var value in values)
+        {
+            response += $"${value.Length}\r\n{value}\r\n"; ;
+        }
+        return response;
     }
 
     private static string Generate40CharacterGuid()
@@ -270,12 +275,12 @@ public class Server
                         response = "+PONG\r\n";
                         break;
                     case "ECHO":
-                        response = BuildBulkString(request[4]);
+                        response = BuildBulkString([request[4]]);
                         break;
                     case "GET":
                         if (dataStore.TryGetValue(request[4], out string? value))
                         {
-                            response = BuildBulkString(value);
+                            response = BuildBulkString([value]);
                         }
                         else
                         {
@@ -313,11 +318,11 @@ public class Server
                         if (MasterHost != string.Empty)
                         {
                             Console.WriteLine($"MasterHost:{MasterHost} MasterPort:{MasterPort}");
-                            response = BuildBulkString($"role:slave");
+                            response = BuildBulkString([$"role:slave"]);
                         }
                         else
                         {
-                            response = BuildArrayString([ "role:master", 
+                            response = BuildBulkString([ "role:master", 
                                 "master_replid:" + MasterReplicationId, 
                                 "master_repl_offset:"+ MasterReplicationOffset.ToString()]);
                         }
