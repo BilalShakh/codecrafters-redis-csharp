@@ -214,6 +214,11 @@ public class Server
         return answer;
     }
 
+    static string BuildBulkString(string value)
+    {
+        return $"${value.Length}\r\n{value}\r\n";
+    }
+
     static async Task HandleClient(Socket clientSocket)
     {
         try
@@ -237,12 +242,12 @@ public class Server
                         response = "+PONG\r\n";
                         break;
                     case "ECHO":
-                        response = $"${request[4].Length}\r\n{request[4]}\r\n";
+                        response = BuildBulkString(request[4]);
                         break;
                     case "GET":
                         if (dataStore.TryGetValue(request[4], out string? value))
                         {
-                            response = $"${value.Length}\r\n{value}\r\n";
+                            response = BuildBulkString(value);
                         }
                         else
                         {
@@ -263,11 +268,11 @@ public class Server
                         {
                             if (request[6] == "dir")
                             {
-                                response = $"*2\r\n$3\r\ndir\r\n${RDBFileDirectory.Length}\r\n{RDBFileDirectory}\r\n";
+                                response = BuildArrayString(["dir", RDBFileDirectory]);
                             }
                             else
                             {
-                                response = $"*2\r\n$10\r\ndbfilename\r\n${RDBFileName.Length}\r\n{RDBFileName}\r\n";
+                                response = BuildArrayString(["dbfilename", RDBFileName]);
                             }
                         }
                         break;
@@ -275,6 +280,9 @@ public class Server
                         string pattern = request[4];
                         var keys = dataStore.Keys.Where(k => k.Contains(pattern) || pattern == "*").ToArray();
                         response = BuildArrayString(keys);
+                        break;
+                    case "INFO":
+                        response = BuildBulkString("role:master");
                         break;
                     default:
                         response = "-ERR unknown command\r\n";
