@@ -10,6 +10,7 @@ public class Server
     public static Dictionary<string, string> dataStore = [];
     public static string RDBFileDirectory = string.Empty;
     public static string RDBFileName = string.Empty;
+    public static int port = 6379;
     public static void Main(string[] args)
     {
         // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -27,11 +28,15 @@ public class Server
                     if (i + 1 < args.Length)
                         RDBFileName = args[i + 1];
                     break;
+                case "--port":
+                    if (i + 1 < args.Length)
+                        port = int.Parse(args[i + 1]);
+                    break;
             }
         }
 
         LoadContents();
-        TcpListener server = new TcpListener(IPAddress.Any, 6379);
+        TcpListener server = new TcpListener(IPAddress.Any, port);
         server.Start();
 
         while (true) // Keep the server running
@@ -104,40 +109,43 @@ public class Server
         {
             ulong expiryTimeStampFC = 0;
             uint expiryTimeStampFD = 0;
-            if (data[index] == 0xFC)
+            switch (data[index])
             {
-                index++;
-                expiryTimeStampFC = ExtractUInt64(data, ref index);
-                Console.WriteLine($"Extracted expiry information. Milliseconds information. Timestamp:{expiryTimeStampFC}");
+                case 0xFC:
+                    index++;
+                    expiryTimeStampFC = ExtractUInt64(data, ref index);
+                    Console.WriteLine($"Extracted expiry information. Milliseconds information. Timestamp: {expiryTimeStampFC}");
+                    index++; // Skip the 0x00 byte
+                    break;
+                case 0xFD:
+                    index++;
+                    expiryTimeStampFD = ExtractUInt32(data, ref index);
+                    Console.WriteLine($"Extracted expiry information. Seconds information. Timestamp: {expiryTimeStampFD}");
+                    index++; // Skip the 0x00 byte
+                    break;
+                case 0x00:
+                    index++;
+                    Console.WriteLine("Skipping 0x00 byte.");
+                    break;
+                case 0xFF:
+                    Console.WriteLine("End of database section detected.");
+                    return index;
             }
-            if (data[index] == 0xFD)
-            {
-                index++;
-                expiryTimeStampFD = ExtractUInt32(data, ref index);
-                Console.WriteLine($"Extracted expiry information. Seconds information. Timestamp:{expiryTimeStampFD}");
-            }
-            if (data[index] == 0x00)
-            {
-                index++;
-                Console.WriteLine("Skipping 0x00 byte.");
-            }
-            if (data[index] == 0xFF)
-            {
-                Console.WriteLine("End of database section detected.");
-                break;
-            }
+            
             // Parse key
             int keyLength = data[index];
             Console.WriteLine($"Key length: {keyLength}");
             index++;
             string key = ParseString(data, ref index, keyLength);
             Console.WriteLine($"Parsed key: {key}");
+            
             // Parse value
             int valueLength = data[index];
             Console.WriteLine($"Value length: {valueLength}");
             index++;
             string value = ParseString(data, ref index, valueLength);
             Console.WriteLine($"Parsed value: {value}");
+            
             if (key.Length == 0)
             {
                 Console.WriteLine("Empty key found. Skipping.");
@@ -151,6 +159,7 @@ public class Server
             }
             dataStore.Add(key, value);
             Console.WriteLine($"Key-Value pair added: {key} => {value}");
+            
             if (expiryTimeStampFC != 0)
             {
                 _ = HandleTimeStampExpiry((long)expiryTimeStampFC, key, false);
