@@ -28,7 +28,7 @@ public class Server
         }
         LoadContents();
         TcpListener server = new TcpListener(IPAddress.Any, port);
-        HandleMasterPing();
+        HandleMasterHandshake();
         server.Start();
 
         while (true) // Keep the server running
@@ -39,7 +39,7 @@ public class Server
         }
     }
 
-    static void HandleMasterPing()
+    static void HandleMasterHandshake()
     {
         if (MasterHost == string.Empty)
         {
@@ -51,11 +51,13 @@ public class Server
 
             NetworkStream stream = tcpClient.GetStream();
 
-            string request = "*1\r\n$4\r\nping\r\n";
+            string[] requests = [BuildArrayString(["ping"]), BuildArrayString(["REPLCONF", "listening-port", "6380"]), BuildArrayString(["REPLCONF", "capa", "psync2"])];
 
-            byte[] data = Encoding.ASCII.GetBytes(request);
-
-            stream.Write(data, 0, data.Length);
+            foreach (var request in requests)
+            {
+                byte[] data = Encoding.ASCII.GetBytes(request);
+                stream.Write(data, 0, data.Length);
+            }
         }
         catch (Exception ex)
         {
@@ -348,6 +350,9 @@ public class Server
                             info.AppendLine($"master_repl_offset:{MasterReplicationOffset}");
                             response = BuildBulkString(info.ToString());
                         }
+                        break;
+                    case "REPLCONF":
+                        response = "+OK\r\n";
                         break;
                     default:
                         response = "-ERR unknown command\r\n";
