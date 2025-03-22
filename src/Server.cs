@@ -28,6 +28,7 @@ public class Server
         }
         LoadContents();
         TcpListener server = new TcpListener(IPAddress.Any, port);
+        HandleMasterPing();
         server.Start();
 
         while (true) // Keep the server running
@@ -35,6 +36,30 @@ public class Server
             Socket clientSocket = server.AcceptSocket(); // wait for client
                                                          // Handle each client in a separate task
             _ = Task.Run(() => HandleClient(clientSocket));
+        }
+    }
+
+    static void HandleMasterPing()
+    {
+        if (MasterHost == string.Empty)
+        {
+            return;
+        }
+        try
+        {
+            TcpClient tcpClient = new TcpClient(MasterHost, MasterPort);
+
+            NetworkStream stream = tcpClient.GetStream();
+
+            string request = "*1\r\n$4\r\nping\r\n";
+
+            byte[] data = Encoding.ASCII.GetBytes(request);
+
+            stream.Write(data, 0, data.Length);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error handling master PING: {ex.Message}");
         }
     }
 
