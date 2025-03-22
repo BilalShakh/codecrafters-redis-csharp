@@ -57,6 +57,9 @@ public class Server
             {
                 byte[] data = Encoding.ASCII.GetBytes(request);
                 stream.Write(data, 0, data.Length);
+
+                var bytesRead = stream.Read(data, 0, data.Length);
+                var responseData = Encoding.ASCII.GetString(data, 0, bytesRead);
             }
         }
         catch (Exception ex)
