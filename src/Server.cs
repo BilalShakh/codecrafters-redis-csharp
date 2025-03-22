@@ -372,6 +372,12 @@ public class Server
 
                 byte[] responseBytes = Encoding.ASCII.GetBytes(response);
                 await Task.Run(() => clientSocket.Send(responseBytes));
+
+                if (request[2] == "PSYNC")
+                {
+                    byte[] RDBBytes = CreateEmptyRDBFile();
+                    await Task.Run(() => clientSocket.Send(RDBBytes));
+                }
             }
         }
         catch (Exception ex)
@@ -382,6 +388,14 @@ public class Server
         {
             clientSocket.Close();
         }
+    }
+
+    static byte[] CreateEmptyRDBFile()
+    {
+        const string emptyRdbFileBase64 = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==";
+        byte[] rdbFile = Convert.FromBase64String(emptyRdbFileBase64);
+        string rdbFileLength = $"${rdbFile.Length}\r\n";
+        return Encoding.ASCII.GetBytes(rdbFileLength).Concat(rdbFile).ToArray();
     }
 
     static async Task HandleExpiry(int timeToExpire, string key)
