@@ -51,7 +51,12 @@ public class Server
 
             NetworkStream stream = tcpClient.GetStream();
 
-            string[] requests = [BuildArrayString(["ping"]), BuildArrayString(["REPLCONF", "listening-port", "6380"]), BuildArrayString(["REPLCONF", "capa", "psync2"])];
+            string[] requests = [
+                BuildArrayString(["ping"]), 
+                BuildArrayString(["REPLCONF", "listening-port", "6380"]), 
+                BuildArrayString(["REPLCONF", "capa", "psync2"]),
+                BuildArrayString(["PSYNC", "?", "-1"]),
+            ];
 
             foreach (var request in requests)
             {
@@ -356,6 +361,9 @@ public class Server
                         break;
                     case "REPLCONF":
                         response = "+OK\r\n";
+                        break;
+                    case "PSYNC":
+                        response = "+FULLRESYNC " + MasterReplicationId + " " + MasterReplicationOffset + "\r\n";
                         break;
                     default:
                         response = "-ERR unknown command\r\n";
