@@ -14,15 +14,16 @@ namespace codecrafters_redis.src
         private static string RDBFileDirectory = string.Empty;
         private static string RDBFileName = string.Empty;
         private static readonly List<Socket> slaveSockets = [];
-        private const int port = 6379;
+        private static int Port = 6379;
 
 
-        public MasterClient(string masterHost, int masterPort, string rdbFileName, string rdbFileDirectory)
+        public MasterClient(string masterHost, int masterPort, string rdbFileName, string rdbFileDirectory, int port)
         {
             MasterHost = masterHost;
             MasterPort = masterPort;
             RDBFileName = rdbFileName;
             RDBFileDirectory = rdbFileDirectory;
+            Port = port;
             if (MasterHost == string.Empty)
             {
                 MasterReplicationId = Utilities.Generate40CharacterGuid();
@@ -32,7 +33,7 @@ namespace codecrafters_redis.src
 
         public static void Start()
         {
-            TcpListener server = new TcpListener(IPAddress.Any, port);
+            TcpListener server = new TcpListener(IPAddress.Any, Port);
             server.Start();
 
             while (true) // Keep the server running

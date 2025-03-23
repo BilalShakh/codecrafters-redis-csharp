@@ -6,6 +6,7 @@ public class Server
     private static string RDBFileDirectory = string.Empty;
     private static string RDBFileName = string.Empty;
     private static string MasterHost = string.Empty;
+    private static int port = 6379;
     private static int MasterPort = 0;
     private static MasterClient? masterClient;
     private static RDBParser? rdbParser;
@@ -19,7 +20,7 @@ public class Server
         LoadUpArgs(args);
         rdbParser = new(RDBFileName, RDBFileDirectory);
         slaveClient = new(MasterHost, MasterPort);
-        masterClient = new(MasterHost, MasterPort, RDBFileName, RDBFileDirectory);
+        masterClient = new(MasterHost, MasterPort, RDBFileName, RDBFileDirectory, port);
     }
 
     static void LoadUpArgs(string[] args)
