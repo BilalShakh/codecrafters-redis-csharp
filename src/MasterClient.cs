@@ -128,7 +128,8 @@ namespace codecrafters_redis.src
                             response = "+FULLRESYNC " + MasterReplicationId + " " + MasterReplicationOffset + "\r\n";
                             break;
                         case "WAIT":
-                            response = Utilities.BuildIntegerString(slaveSockets.Count);
+                            int responseCount = await HandleWaitAsync(request);
+                            response = Utilities.BuildIntegerString(responseCount);
                             break;
                         default:
                             response = "-ERR unknown command\r\n";
@@ -161,6 +162,55 @@ namespace codecrafters_redis.src
             {
                 clientSocket.Close();
             }
+        }
+
+        private static async Task<int> HandleWaitAsync(string[] input)
+        {
+            if (input.Length != 3)
+            {
+                throw new Exception("Invalid input for handle wait.");
+            }
+
+            int replicaCount = int.Parse(input[1]);
+            int timeout = int.Parse(input[2]);
+            HashSet<Socket> replicasWithUpdate = new();
+            var expireTime = DateTime.Now.AddMilliseconds(timeout);
+
+            Console.WriteLine($"replicaCount = {replicaCount}, expireTime = {expireTime}");
+
+            foreach (var replica in ReplicaRegistry.Replicas)
+            {
+                int key = replica.Key;
+                if (!ReplicaRegistry.ReplicasFinished[key])
+                {
+                    string replConfRequest = Utilities.BuildArrayString(["REPLCONF", "GETACK", "*"]);
+                    byte[] replConfData = Encoding.ASCII.GetBytes(replConfRequest);
+                    await Task.Run(() => replica.Value.Send(replConfData));
+                }
+                else
+                {
+                    replicasWithUpdate.Add(replica.Value);
+                }
+            }
+
+            while (DateTime.Now < expireTime && replicasWithUpdate.Count < replicaCount)
+            {
+                foreach (var replica in ReplicaRegistry.Replicas)
+                {
+                    if (replicasWithUpdate.Count >= replicaCount)
+                        break;
+
+                    if (replicasWithUpdate.Contains(replica.Value))
+                        continue;
+
+                    if (ReplicaRegistry.ReplicasFinished[replica.Key])
+                    {
+                        replicasWithUpdate.Add(replica.Value);
+                    }
+                }
+            }
+
+            return replicasWithUpdate.Count;
         }
 
         static async Task HandleExpiry(int timeToExpire, string key)

@@ -54,6 +54,7 @@ namespace codecrafters_redis.src
 
         static async Task HandleSlaveClient(Socket clientSocket)
         {
+            int key = ReplicaRegistry.Replicas.FirstOrDefault(x => x.Value == clientSocket).Key;
             try
             {
                 while (true) // Keep connection alive
@@ -111,9 +112,10 @@ namespace codecrafters_redis.src
                             case "REPLCONF":
                                 if (request.Length >= 3)
                                 {
-                                    Console.WriteLine($"REPLCONF command received. Key: {request[1]}, Value: {request[2]}");
+                                    Console.WriteLine($"REPLCONF command received. Key: {request[1]}, Value: {request[2]}, ReplicaRegistryKey: {key}");
                                 }
                                 string replconfResponse = Utilities.BuildArrayString(["REPLCONF", "ACK", SlaveReplicationOffset.ToString()]);
+                                ReplicaRegistry.ReplicasFinished[key] = requestBytes.Sum() >= bytesRead;
                                 await SendResponse(clientSocket, replconfResponse);
                                 break;
                             default:
@@ -122,6 +124,7 @@ namespace codecrafters_redis.src
                         }
                         SlaveReplicationOffset += requestBytes[i];
                     }
+                    ReplicaRegistry.ReplicasFinished[key] = true;
                 }
             }
             catch (Exception ex)
