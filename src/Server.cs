@@ -168,8 +168,8 @@ public class Server
             NetworkStream stream = tcpClient.GetStream();
 
             string[] requests = [
-                BuildArrayString(["ping"]), 
-                BuildArrayString(["REPLCONF", "listening-port", "6380"]), 
+                BuildArrayString(["ping"]),
+                BuildArrayString(["REPLCONF", "listening-port", "6380"]),
                 BuildArrayString(["REPLCONF", "capa", "psync2"]),
                 BuildArrayString(["PSYNC", "?", "-1"]),
             ];
@@ -182,6 +182,8 @@ public class Server
                 var bytesRead = stream.Read(data, 0, data.Length);
                 var responseData = Encoding.ASCII.GetString(data, 0, bytesRead);
             }
+
+            _ = Task.Run(() => HandleSlaveClient(tcpClient.Client));
         }
         catch (Exception ex)
         {
@@ -278,7 +280,7 @@ public class Server
             throw;
         }
     }
-    
+
     static int ParseDatabaseSection(byte[] data, int startIndex)
     {
         int index = startIndex + 1;
@@ -312,21 +314,21 @@ public class Server
                     Console.WriteLine("End of database section detected.");
                     return index;
             }
-            
+
             // Parse key
             int keyLength = data[index];
             Console.WriteLine($"Key length: {keyLength}");
             index++;
             string key = ParseString(data, ref index, keyLength);
             Console.WriteLine($"Parsed key: {key}");
-            
+
             // Parse value
             int valueLength = data[index];
             Console.WriteLine($"Value length: {valueLength}");
             index++;
             string value = ParseString(data, ref index, valueLength);
             Console.WriteLine($"Parsed value: {value}");
-            
+
             if (key.Length == 0)
             {
                 Console.WriteLine("Empty key found. Skipping.");
@@ -340,7 +342,7 @@ public class Server
             }
             dataStore.Add(key, value);
             Console.WriteLine($"Key-Value pair added: {key} => {value}");
-            
+
             if (expiryTimeStampFC != 0)
             {
                 _ = HandleTimeStampExpiry((long)expiryTimeStampFC, key, false);
@@ -354,7 +356,7 @@ public class Server
         }
         return index;
     }
-    
+
     static string ParseString(byte[] data, ref int index, int length)
     {
         string result =
@@ -433,5 +435,42 @@ public class Server
         }
         await Task.Delay((int)delay);
         dataStore.Remove(key);
+    }
+
+    static async Task HandleSlaveClient(Socket clientSocket)
+    {
+        try
+        {
+            while (true) // Keep connection alive
+            {
+                byte[] buffer = new byte[1024];
+                int bytesRead = await Task.Run(() => clientSocket.Receive(buffer));
+                if (bytesRead == 0) // Client disconnected
+                {
+                    break;
+                }
+                string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
+                var request = receivedData.Split("\r\n");
+                Console.WriteLine("Received data from master: " + receivedData);
+
+                switch (request[2])
+                {
+                    case "SET":
+                        dataStore[request[4]] = request[6];
+                        break;
+                    default:
+                        Console.WriteLine("Unknown command received from master.");
+                        break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error handling slave client: {ex.Message}");
+        }
+        finally
+        {
+            clientSocket.Close();
+        }
     }
 }
