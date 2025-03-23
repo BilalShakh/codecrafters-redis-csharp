@@ -518,8 +518,8 @@ public class Server
         {
             await Task.Run(() => clientSocket.Send(responseBytes));
         }
-        Console.WriteLine($"Bytes sent: {responseBytes.Length}");
-        MasterReplicationOffset += responseBytes.Length;
+        Console.WriteLine($"Bytes sent: {responseBytes.Length + 3}");
+        MasterReplicationOffset += responseBytes.Length + 3;
     }
 
     static List<string[]> ParseRESP(string data)
