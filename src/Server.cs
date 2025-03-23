@@ -517,6 +517,7 @@ public class Server
         catch (Exception ex)
         {
             Console.WriteLine($"Error handling slave client: {ex.Message}");
+            Console.WriteLine(ex.StackTrace);
         }
         finally
         {
