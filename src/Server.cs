@@ -553,11 +553,26 @@ public class Server
             else if (lines[i].StartsWith("$"))
             {
                 int length = int.Parse(lines[i].Substring(1));
-                bytesList[bytesList.Count - 1] += lines[i].Length + 2; // Include \r\n
+                if (bytesList.Count == 0)
+                {
+                    bytesList.Add(lines[i].Length + 2); // Include \r\n
+                }
+                else
+                {
+                    bytesList[bytesList.Count - 1] += lines[i].Length + 2; // Include \r\n
+                }
+
                 if (i + 1 < lines.Length && lines[i + 1].Length == length)
                 {
                     currentArray.Add(lines[i + 1]);
-                    bytesList[bytesList.Count - 1] += lines[i + 1].Length + 2; // Include \r\n
+                    if (bytesList.Count == 0)
+                    {
+                        bytesList.Add(lines[i].Length + 2); // Include \r\n
+                    }
+                    else
+                    {
+                        bytesList[bytesList.Count - 1] += lines[i].Length + 2; // Include \r\n
+                    }
                     i++; // Skip the next line as it is part of the bulk string
                 }
             }
