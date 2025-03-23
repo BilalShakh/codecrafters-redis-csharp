@@ -524,7 +524,6 @@ public class Server
         }
     }
 
-
     static async Task SendResponse(Socket clientSocket, string response)
     {
         byte[] responseBytes = Encoding.ASCII.GetBytes(response);
@@ -555,6 +554,7 @@ public class Server
                 bytesList[bytesList.Count - 1] += lines[i].Length + 2; // Include \r\n
                 if (i + 1 < lines.Length && lines[i + 1].Length == length)
                 {
+                    Console.WriteLine($"Adding bulk string: {lines[i + 1]}");
                     currentArray.Add(lines[i + 1]);
                     bytesList[bytesList.Count - 1] += lines[i + 1].Length + 2; // Include \r\n
                     i++; // Skip the next line as it is part of the bulk string
