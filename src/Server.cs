@@ -547,6 +547,7 @@ public class Server
 
             if (lines[i].StartsWith("*"))
             {
+                Console.WriteLine("Array detected here: " + lines[i]);
                 if (currentArray.Count > 0)
                 {
                     result.Add(currentArray.ToArray());
