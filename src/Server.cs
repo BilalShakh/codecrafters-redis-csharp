@@ -561,6 +561,7 @@ public class Server
             }
             else if (lines[i].StartsWith("$"))
             {
+                Console.WriteLine("Bulk string detected here: " + lines[i]);
                 int length = int.Parse(lines[i].Substring(1));
                 currentBytes += lines[i].Length + 2;
                 if (i + 1 < lines.Length && lines[i + 1].Length == length)
@@ -580,6 +581,7 @@ public class Server
             }
             else
             {
+                Console.WriteLine("Other data: " + lines[i]);
                 if (currentArray.Count > 0)
                 {
                     result.Add(currentArray.ToArray());
