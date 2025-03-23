@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace codecrafters_redis.src
 {
@@ -142,6 +143,10 @@ namespace codecrafters_redis.src
                     if (request[2] == "SET")
                     {
                         string slaveResponse = Utilities.BuildArrayString(["SET", request[4], request[6]]);
+                        if (MasterHost == string.Empty)
+                        {
+                            UpdateAllSubscribersAsync(slaveResponse);
+                        }
                         SendToSlaves(slaveResponse);
                     }
 
@@ -168,6 +173,18 @@ namespace codecrafters_redis.src
         {
             string[] parsedInput = [input[2], input[4], input[6]];
             return parsedInput;
+        }
+
+        private static void UpdateAllSubscribersAsync(string data)
+        {
+            var bytesTosend = Encoding.UTF8.GetBytes(data);
+
+            foreach (var item in ReplicaRegistry.Replicas)
+            {
+                int key = item.Key;
+                ReplicaRegistry.BytesPropogated[key] += bytesTosend.Length;
+                ReplicaRegistry.ReplicasFinished[key] = false;
+            }
         }
 
         private static async Task<int> HandleWaitAsync(string[] input)
