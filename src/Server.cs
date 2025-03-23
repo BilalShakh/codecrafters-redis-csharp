@@ -450,7 +450,7 @@ public class Server
                     break;
                 }
                 string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
-                Console.WriteLine("Received data from master: " + receivedData);
+                Console.WriteLine($"Received {bytesRead} bytes data from master: " + receivedData);
 
                 var requests = ParseRESP(receivedData, out int[] requestBytes);
 
@@ -537,9 +537,20 @@ public class Server
         var result = new List<string[]>();
         var currentArray = new List<string>();
         var bytesList = new List<int>();
+        bool validDataStarted = false;
 
         for (int i = 0; i < lines.Length; i++)
         {
+            if (lines[i].StartsWith("*") || lines[i].StartsWith("$"))
+            {
+                validDataStarted = true;
+            }
+
+            if (!validDataStarted)
+            {
+                continue;
+            }
+
             if (lines[i].StartsWith("*"))
             {
                 if (currentArray.Count > 0)
