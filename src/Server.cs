@@ -8,6 +8,7 @@ namespace codecrafters_redis.src;
 public class Server
 {
     private static readonly Dictionary<string, string> dataStore = [];
+    private static readonly List<Socket> slaveSockets = [];
     private static string RDBFileDirectory = string.Empty;
     private static string RDBFileName = string.Empty;
     private static int port = 6379;
@@ -36,6 +37,121 @@ public class Server
             Socket clientSocket = server.AcceptSocket(); // wait for client
                                                          // Handle each client in a separate task
             _ = Task.Run(() => HandleClient(clientSocket));
+        }
+    }
+
+    static async Task HandleClient(Socket clientSocket)
+    {
+        try
+        {
+            while (true) // Keep connection alive
+            {
+                byte[] buffer = new byte[1024];
+                int bytesRead = await Task.Run(() => clientSocket.Receive(buffer));
+                if (bytesRead == 0) // Client disconnected
+                {
+                    break;
+                }
+                string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
+                var request = receivedData.Split("\r\n");
+                Console.WriteLine("Received data: " + receivedData);
+
+                string response = string.Empty;
+                switch (request[2])
+                {
+                    case "PING":
+                        response = "+PONG\r\n";
+                        break;
+                    case "ECHO":
+                        response = BuildBulkString(request[4]);
+                        break;
+                    case "GET":
+                        if (dataStore.TryGetValue(request[4], out string? value))
+                        {
+                            response = BuildBulkString(value);
+                        }
+                        else
+                        {
+                            response = "$-1\r\n";
+                        }
+                        break;
+                    case "SET":
+                        dataStore.Add(request[4], request[6]);
+                        if (request.Length > 7 && request[8] == "px")
+                        {
+                            int timeToExpire = int.Parse(request[10]);
+                            _ = HandleExpiry(timeToExpire, request[4]);
+                        }
+                        response = "+OK\r\n";
+                        break;
+                    case "CONFIG":
+                        if (request[6] == "dir" || request[6] == "dbfilename")
+                        {
+                            if (request[6] == "dir")
+                            {
+                                response = BuildArrayString(["dir", RDBFileDirectory]);
+                            }
+                            else
+                            {
+                                response = BuildArrayString(["dbfilename", RDBFileName]);
+                            }
+                        }
+                        break;
+                    case "KEYS":
+                        string pattern = request[4];
+                        var keys = dataStore.Keys.Where(k => k.Contains(pattern) || pattern == "*").ToArray();
+                        response = BuildArrayString(keys);
+                        break;
+                    case "INFO":
+                        if (MasterHost != string.Empty)
+                        {
+                            Console.WriteLine($"MasterHost:{MasterHost} MasterPort:{MasterPort}");
+                            response = BuildBulkString($"role:slave");
+                        }
+                        else
+                        {
+                            StringBuilder info = new();
+                            info.AppendLine("role:master");
+                            info.AppendLine($"master_replid:{MasterReplicationId}");
+                            info.AppendLine($"master_repl_offset:{MasterReplicationOffset}");
+                            response = BuildBulkString(info.ToString());
+                        }
+                        break;
+                    case "REPLCONF":
+                        response = "+OK\r\n";
+                        break;
+                    case "PSYNC":
+                        response = "+FULLRESYNC " + MasterReplicationId + " " + MasterReplicationOffset + "\r\n";
+                        break;
+                    default:
+                        response = "-ERR unknown command\r\n";
+                        break;
+                }
+
+                byte[] responseBytes = Encoding.ASCII.GetBytes(response);
+                await Task.Run(() => clientSocket.Send(responseBytes));
+
+                if (request[2] == "SET")
+                {
+                    string slaveResponse = BuildArrayString(["SET", request[4], request[6]]);
+                    SendToSlaves(slaveResponse);
+                }
+
+                if (request[2] == "PSYNC")
+                {
+                    byte[] RDBBytes = CreateEmptyRDBFile();
+                    await Task.Run(() => clientSocket.Send(RDBBytes));
+                    slaveSockets.Add(clientSocket);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error handling client: {ex.Message}");
+        }
+        finally
+        {
+            clientSocket.Close();
         }
     }
 
@@ -70,6 +186,15 @@ public class Server
         catch (Exception ex)
         {
             Console.WriteLine($"Error handling master PING: {ex.Message}");
+        }
+    }
+
+    static void SendToSlaves(string data)
+    {
+        foreach (var slaveSocket in slaveSockets)
+        {
+            byte[] responseBytes = Encoding.ASCII.GetBytes(data);
+            slaveSocket.Send(responseBytes);
         }
     }
 
@@ -280,114 +405,6 @@ public class Server
         string guid = Guid.NewGuid().ToString("N"); // 32 characters
         string extraChars = Guid.NewGuid().ToString("N").Substring(0, 8); // 8 additional characters
         return guid + extraChars; // 40 characters in total
-    }
-
-    static async Task HandleClient(Socket clientSocket)
-    {
-        try
-        {
-            while (true) // Keep connection alive
-            {
-                byte[] buffer = new byte[1024];
-                int bytesRead = await Task.Run(() => clientSocket.Receive(buffer));
-                if (bytesRead == 0) // Client disconnected
-                {
-                    break;
-                }
-                string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
-                var request = receivedData.Split("\r\n");
-                Console.WriteLine("Received data: " + receivedData);
-
-                string response = string.Empty;
-                switch (request[2])
-                {
-                    case "PING":
-                        response = "+PONG\r\n";
-                        break;
-                    case "ECHO":
-                        response = BuildBulkString(request[4]);
-                        break;
-                    case "GET":
-                        if (dataStore.TryGetValue(request[4], out string? value))
-                        {
-                            response = BuildBulkString(value);
-                        }
-                        else
-                        {
-                            response = "$-1\r\n";
-                        }
-                        break;
-                    case "SET":
-                        dataStore.Add(request[4], request[6]);
-                        if (request.Length > 7 && request[8] == "px")
-                        {
-                            int timeToExpire = int.Parse(request[10]);
-                            _ = HandleExpiry(timeToExpire, request[4]);
-                        }
-                        response = "+OK\r\n";
-                        break;
-                    case "CONFIG":
-                        if (request[6] == "dir" || request[6] == "dbfilename")
-                        {
-                            if (request[6] == "dir")
-                            {
-                                response = BuildArrayString(["dir", RDBFileDirectory]);
-                            }
-                            else
-                            {
-                                response = BuildArrayString(["dbfilename", RDBFileName]);
-                            }
-                        }
-                        break;
-                    case "KEYS":
-                        string pattern = request[4];
-                        var keys = dataStore.Keys.Where(k => k.Contains(pattern) || pattern == "*").ToArray();
-                        response = BuildArrayString(keys);
-                        break;
-                    case "INFO":
-                        if (MasterHost != string.Empty)
-                        {
-                            Console.WriteLine($"MasterHost:{MasterHost} MasterPort:{MasterPort}");
-                            response = BuildBulkString($"role:slave");
-                        }
-                        else
-                        {
-                            StringBuilder info = new();
-                            info.AppendLine("role:master");
-                            info.AppendLine($"master_replid:{MasterReplicationId}");
-                            info.AppendLine($"master_repl_offset:{MasterReplicationOffset}");
-                            response = BuildBulkString(info.ToString());
-                        }
-                        break;
-                    case "REPLCONF":
-                        response = "+OK\r\n";
-                        break;
-                    case "PSYNC":
-                        response = "+FULLRESYNC " + MasterReplicationId + " " + MasterReplicationOffset + "\r\n";
-                        break;
-                    default:
-                        response = "-ERR unknown command\r\n";
-                        break;
-                }
-
-                byte[] responseBytes = Encoding.ASCII.GetBytes(response);
-                await Task.Run(() => clientSocket.Send(responseBytes));
-
-                if (request[2] == "PSYNC")
-                {
-                    byte[] RDBBytes = CreateEmptyRDBFile();
-                    await Task.Run(() => clientSocket.Send(RDBBytes));
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error handling client: {ex.Message}");
-        }
-        finally
-        {
-            clientSocket.Close();
-        }
     }
 
     static byte[] CreateEmptyRDBFile()
