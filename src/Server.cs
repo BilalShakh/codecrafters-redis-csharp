@@ -535,7 +535,7 @@ public class Server
 
         for (int i = 0; i < lines.Length; i++)
         {
-            if (lines[i].StartsWith("*"))
+            if (lines[i].StartsWith("*") && lines[i].Length > 1)
             {
                 validDataStarted = true;
             }
