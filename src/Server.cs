@@ -463,10 +463,13 @@ public class Server
 
                     switch (request[0].ToUpper())
                     {
+                        case "PING":
+                            await SendResponse(clientSocket, "+PONG\r\n");
+                            break;
                         case "SET":
                             if (request.Length >= 3)
                             {
-                                dataStore.Add(request[1], request[2]);
+                                dataStore[request[1]] = request[2];
                                 Console.WriteLine($"SET command received. Key: {request[1]}, Value: {request[2]}");
                             }
                             break;
@@ -475,14 +478,11 @@ public class Server
                             {
                                 if (dataStore.TryGetValue(request[1], out string? value))
                                 {
-                                    string response = BuildBulkString(value);
-                                    byte[] responseBytes = Encoding.ASCII.GetBytes(response);
-                                    await Task.Run(() => clientSocket.Send(responseBytes));
+                                    await SendResponse(clientSocket, BuildBulkString(value));
                                 }
                                 else
                                 {
-                                    byte[] responseBytes = Encoding.ASCII.GetBytes("$-1\r\n");
-                                    await Task.Run(() => clientSocket.Send(responseBytes));
+                                    await SendResponse(clientSocket, "$-1\r\n");
                                 }
                             }
                             break;
@@ -491,9 +491,8 @@ public class Server
                             {
                                 Console.WriteLine($"REPLCONF command received. Key: {request[1]}, Value: {request[2]}");
                             }
-                            string replconfResponse = BuildArrayString(["REPLCONF", "ACK", "0"]);
-                            byte[] replconfResponseBytes = Encoding.ASCII.GetBytes(replconfResponse);
-                            await Task.Run(() => clientSocket.Send(replconfResponseBytes));
+                            string replconfResponse = BuildArrayString(["REPLCONF", "ACK", MasterReplicationOffset.ToString()]);
+                            await SendResponse(clientSocket, replconfResponse);
                             break;
                         default:
                             Console.WriteLine("Unknown command received from master.");
@@ -510,6 +509,13 @@ public class Server
         {
             clientSocket.Close();
         }
+    }
+
+    static async Task SendResponse(Socket clientSocket, string response)
+    {
+        byte[] responseBytes = Encoding.ASCII.GetBytes(response);
+        await Task.Run(() => clientSocket.Send(responseBytes));
+        MasterReplicationOffset += responseBytes.Length;
     }
 
     static List<string[]> ParseRESP(string data)
