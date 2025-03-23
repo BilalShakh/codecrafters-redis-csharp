@@ -183,7 +183,7 @@ public class Server
                 var responseData = Encoding.ASCII.GetString(data, 0, bytesRead);
             }
 
-            _ = Task.Run(() => HandleClient(tcpClient.Client));
+            _ = Task.Run(() => HandleSlaveClient(tcpClient.Client));
         }
         catch (Exception ex)
         {
@@ -456,7 +456,15 @@ public class Server
                 switch (request[2])
                 {
                     case "SET":
-                        dataStore[request[4]] = request[6];
+                        dataStore.Add(request[4], request[6]);
+                        break;
+                    case "GET":
+                        if (dataStore.TryGetValue(request[4], out string? value))
+                        {
+                            string response = BuildArrayString(["GET", request[4], value]);
+                            byte[] responseBytes = Encoding.ASCII.GetBytes(response);
+                            await Task.Run(() => clientSocket.Send(responseBytes));
+                        }
                         break;
                     default:
                         Console.WriteLine("Unknown command received from master.");
