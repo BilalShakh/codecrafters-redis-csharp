@@ -452,7 +452,10 @@ public class Server
                 string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
                 Console.WriteLine("Received data from master: " + receivedData);
 
-                var requests = ParseRESP(receivedData);
+                var requests = ParseRESP(receivedData, out int totalBytes);
+                // Increment the offset after processing the request
+                MasterReplicationOffset += totalBytes;
+
                 foreach (var request in requests)
                 {
                     if (request.Length == 0)
@@ -518,15 +521,14 @@ public class Server
         {
             await Task.Run(() => clientSocket.Send(responseBytes));
         }
-        Console.WriteLine($"Bytes sent: {responseBytes.Length + 3}");
-        MasterReplicationOffset += responseBytes.Length + 3;
     }
 
-    static List<string[]> ParseRESP(string data)
+    static List<string[]> ParseRESP(string data, out int totalBytes)
     {
         var lines = data.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
         var result = new List<string[]>();
         var currentArray = new List<string>();
+        totalBytes = 0;
 
         for (int i = 0; i < lines.Length; i++)
         {
@@ -537,13 +539,16 @@ public class Server
                     result.Add(currentArray.ToArray());
                     currentArray.Clear();
                 }
+                totalBytes += lines[i].Length + 2; // Include \r\n
             }
             else if (lines[i].StartsWith("$"))
             {
                 int length = int.Parse(lines[i].Substring(1));
+                totalBytes += lines[i].Length + 2; // Include \r\n
                 if (i + 1 < lines.Length && lines[i + 1].Length == length)
                 {
                     currentArray.Add(lines[i + 1]);
+                    totalBytes += lines[i + 1].Length + 2; // Include \r\n
                     i++; // Skip the next line as it is part of the bulk string
                 }
             }
