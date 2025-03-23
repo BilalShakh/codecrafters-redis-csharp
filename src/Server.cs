@@ -466,7 +466,6 @@ public class Server
                     switch (request[0].ToUpper())
                     {
                         case "PING":
-                            await SendResponse(clientSocket, "+PONG\r\n");
                             break;
                         case "SET":
                             if (request.Length >= 3)
