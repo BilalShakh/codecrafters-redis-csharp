@@ -128,7 +128,7 @@ namespace codecrafters_redis.src
                             response = "+FULLRESYNC " + MasterReplicationId + " " + MasterReplicationOffset + "\r\n";
                             break;
                         case "WAIT":
-                            response = "0";
+                            response = Utilities.BuildIntegerString(0);
                             break;
                         default:
                             response = "-ERR unknown command\r\n";

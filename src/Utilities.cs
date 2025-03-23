@@ -19,6 +19,11 @@ namespace codecrafters_redis.src
             return $"${value.Length}\r\n{value}\r\n";
         }
 
+        public static string BuildIntegerString(int value)
+        {
+            return $":{value}\r\n";
+        }
+
         public static string Generate40CharacterGuid()
         {
             string guid = Guid.NewGuid().ToString("N"); // 32 characters
