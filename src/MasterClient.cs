@@ -33,7 +33,7 @@ namespace codecrafters_redis.src
 
         public static void Start()
         {
-            TcpListener server = new TcpListener(IPAddress.Any, Port);
+            TcpListener server = new(IPAddress.Any, Port);
             server.Start();
 
             while (true) // Keep the server running
@@ -166,10 +166,7 @@ namespace codecrafters_redis.src
 
         private static string[] ParseWaitInput(string[] input)
         {
-            string[] parsedInput = new string[3];
-            parsedInput[0] = input[2];
-            parsedInput[1] = input[4];
-            parsedInput[2] = input[6];
+            string[] parsedInput = [input[2], input[4], input[6]];
             return parsedInput;
         }
 
