@@ -452,11 +452,6 @@ public class Server
                 string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
                 Console.WriteLine($"Received {bytesRead} bytes data from master: " + receivedData);
 
-                if (bytesRead == 156) 
-                {
-                    continue;
-                }
-
                 var requests = ParseRESP(receivedData, out int[] requestBytes);
 
                 for (int i = 0; i < requests.Count; i++)
@@ -540,7 +535,7 @@ public class Server
 
         for (int i = 0; i < lines.Length; i++)
         {
-            if (lines[i].StartsWith("*") || lines[i].StartsWith("$"))
+            if (lines[i].StartsWith("*"))
             {
                 validDataStarted = true;
             }
