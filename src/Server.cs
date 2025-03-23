@@ -514,7 +514,10 @@ public class Server
     static async Task SendResponse(Socket clientSocket, string response)
     {
         byte[] responseBytes = Encoding.ASCII.GetBytes(response);
-        await Task.Run(() => clientSocket.Send(responseBytes));
+        if (!response.Contains("PONG"))
+        {
+            await Task.Run(() => clientSocket.Send(responseBytes));
+        }
         MasterReplicationOffset += responseBytes.Length;
     }
 
