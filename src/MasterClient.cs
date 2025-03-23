@@ -244,6 +244,7 @@ namespace codecrafters_redis.src
 
         static void SendToSlaves(string data)
         {
+            Console.WriteLine("Sending data to slaves: " + data);
             foreach (var slaveSocket in slaveSockets)
             {
                 byte[] responseBytes = Encoding.ASCII.GetBytes(data);
