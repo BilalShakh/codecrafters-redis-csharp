@@ -450,7 +450,7 @@ public class Server
                     break;
                 }
                 int index = 0;
-                if (bytesRead > 118)
+                if (bytesRead > 120)
                 {
                     index = 119;
                 }
@@ -586,7 +586,6 @@ public class Server
             }
             else
             {
-                Console.WriteLine("Other data: " + lines[i]);
                 if (currentArray.Count > 0)
                 {
                     result.Add(currentArray.ToArray());
@@ -594,9 +593,6 @@ public class Server
                     bytes.Add(currentBytes);
                     currentBytes = 0;
                 }
-                currentArray.Add(lines[i]);
-                result.Add(currentArray.ToArray());
-                currentArray.Clear();
             }
         }
 
@@ -612,6 +608,4 @@ public class Server
         Console.WriteLine("Request Bytes: " + string.Join(", ", requestBytes));
         return result;
     }
-
-
 }
