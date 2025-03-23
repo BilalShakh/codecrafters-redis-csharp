@@ -531,7 +531,7 @@ public class Server
         List<int> bytes = [];
         int currentBytes = 0;
 
-        Console.WriteLine("Lines: " + string.Join(",", lines));
+        //Console.WriteLine("Lines: " + string.Join(",", lines));
 
         for (int i = 0; i < lines.Length; i++)
         {
