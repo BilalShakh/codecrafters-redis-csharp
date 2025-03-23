@@ -525,8 +525,11 @@ public class Server
         var lines = data.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
         var result = new List<string[]>();
         var currentArray = new List<string>();
-        var bytesList = new List<int>();
-        bool validDataStarted = false;
+        int expectedLength = 0;
+        bool inArray = false;
+        var validDataStarted = false;
+        List<int> bytes = [];
+        int currentBytes = 0;
 
         Console.WriteLine("Lines: " + string.Join(",", lines));
 
@@ -548,43 +551,57 @@ public class Server
                 {
                     result.Add(currentArray.ToArray());
                     currentArray.Clear();
+                    bytes.Add(currentBytes);
+                    currentBytes = 0;
                 }
-                bytesList.Add(lines[i].Length + 2); // Include \r\n
+                expectedLength = int.Parse(lines[i].Substring(1)) * 2;
+                inArray = true;
+                currentBytes += lines[i].Length + 2;
             }
             else if (lines[i].StartsWith("$"))
             {
                 int length = int.Parse(lines[i].Substring(1));
-                if (bytesList.Count == 0)
-                {
-                    bytesList.Add(lines[i].Length + 2); // Include \r\n
-                }
-                else
-                {
-                    bytesList[bytesList.Count - 1] += lines[i].Length + 2; // Include \r\n
-                }
-
+                currentBytes += lines[i].Length + 2;
                 if (i + 1 < lines.Length && lines[i + 1].Length == length)
                 {
                     currentArray.Add(lines[i + 1]);
-                    if (bytesList.Count == 0)
-                    {
-                        bytesList.Add(lines[i].Length + 2); // Include \r\n
-                    }
-                    else
-                    {
-                        bytesList[bytesList.Count - 1] += lines[i].Length + 4; // Include \r\n
-                    }
+                    currentBytes += lines[i + 1].Length + 2;
                     i++; // Skip the next line as it is part of the bulk string
                 }
+                if (inArray && currentArray.Count == expectedLength)
+                {
+                    result.Add(currentArray.ToArray());
+                    currentArray.Clear();
+                    inArray = false;
+                    bytes.Add(currentBytes);
+                    currentBytes = 0;
+                }
+            }
+            else
+            {
+                if (currentArray.Count > 0)
+                {
+                    result.Add(currentArray.ToArray());
+                    currentArray.Clear();
+                    bytes.Add(currentBytes);
+                    currentBytes = 0;
+                }
+                currentArray.Add(lines[i]);
+                result.Add(currentArray.ToArray());
+                currentArray.Clear();
             }
         }
 
         if (currentArray.Count > 0)
         {
             result.Add(currentArray.ToArray());
+            bytes.Add(currentBytes);
+            currentBytes = 0;
         }
 
-        requestBytes = bytesList.ToArray();
+        requestBytes = bytes.ToArray();
+        Console.WriteLine("Parsed RESP: " + string.Join(",", result));
+        Console.WriteLine("Request Bytes: " + string.Join(",", requestBytes));
         return result;
     }
 
