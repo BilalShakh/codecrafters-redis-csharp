@@ -142,6 +142,9 @@ public class Server
                     byte[] RDBBytes = CreateEmptyRDBFile();
                     await Task.Run(() => clientSocket.Send(RDBBytes));
                     slaveSockets.Add(clientSocket);
+
+                    string slaveGetAck = BuildArrayString(["REPLCONF", "GETACK", "*"]);
+                    await Task.Run(() => clientSocket.Send(Encoding.ASCII.GetBytes(slaveGetAck)));
                 }
             }
         }
@@ -485,6 +488,15 @@ public class Server
                                     await Task.Run(() => clientSocket.Send(responseBytes));
                                 }
                             }
+                            break;
+                        case "REPLCONF":
+                            if (request.Length >= 3)
+                            {
+                                Console.WriteLine($"REPLCONF command received. Key: {request[1]}, Value: {request[2]}");
+                            }
+                            string replconfResponse = BuildArrayString(["REPLCONF", "ACK", "0"]);
+                            byte[] replconfResponseBytes = Encoding.ASCII.GetBytes(replconfResponse);
+                            await Task.Run(() => clientSocket.Send(replconfResponseBytes));
                             break;
                         default:
                             Console.WriteLine("Unknown command received from master.");
