@@ -518,6 +518,7 @@ public class Server
         {
             await Task.Run(() => clientSocket.Send(responseBytes));
         }
+        Console.WriteLine($"Bytes sent: {responseBytes.Length}");
         MasterReplicationOffset += responseBytes.Length;
     }
 
