@@ -148,6 +148,7 @@ namespace codecrafters_redis.src
                     {
                         byte[] RDBBytes = CreateEmptyRDBFile();
                         slaveSockets.Add(clientSocket);
+                        ReplicaRegistry.RegisterReplica(slaveSockets.Count - 1, clientSocket);
                         await Task.Run(() => clientSocket.Send(RDBBytes));
                     }
                 }
