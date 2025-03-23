@@ -10,6 +10,7 @@ namespace codecrafters_redis.src
         public static void RegisterReplica(int key, Socket value)
         {
             Replicas[key] = value;
+            ReplicasFinished[key] = false;
         }
     }
 }
