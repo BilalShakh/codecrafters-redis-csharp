@@ -449,7 +449,12 @@ public class Server
                 {
                     break;
                 }
-                string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
+                int index = 0;
+                if (bytesRead > 118)
+                {
+                    index = 119;
+                }
+                string receivedData = Encoding.ASCII.GetString(buffer, index, bytesRead).Trim();
                 Console.WriteLine($"Received {bytesRead} bytes data from master: " + receivedData);
 
                 var requests = ParseRESP(receivedData, out int[] requestBytes);
