@@ -454,6 +454,12 @@ public class Server
 
                 var requests = ParseRESP(receivedData, out int[] requestBytes);
 
+                if (requests.Count != requestBytes.Length)
+                {
+                    Console.WriteLine($"Mismatch between requests and requestBytes length. requests.Count:{requests.Count} requestBytes.Length:{requestBytes.Length}");
+                    continue;
+                }
+
                 for (int i = 0; i < requests.Count; i++)
                 {
                     var request = requests[i];
@@ -515,6 +521,7 @@ public class Server
             clientSocket.Close();
         }
     }
+
 
     static async Task SendResponse(Socket clientSocket, string response)
     {
