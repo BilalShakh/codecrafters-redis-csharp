@@ -454,6 +454,8 @@ public class Server
 
                 var requests = ParseRESP(receivedData, out int[] requestBytes);
 
+                Console.WriteLine(String.Join(", ", requestBytes));
+
                 if (requests.Count != requestBytes.Length)
                 {
                     Console.WriteLine($"Mismatch between requests and requestBytes length. requests.Count:{requests.Count} requestBytes.Length:{requestBytes.Length}");
