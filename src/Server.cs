@@ -450,25 +450,46 @@ public class Server
                     break;
                 }
                 string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
-                var request = receivedData.Split("\r\n");
                 Console.WriteLine("Received data from master: " + receivedData);
 
-                switch (request[2])
+                var requests = ParseRESP(receivedData);
+                foreach (var request in requests)
                 {
-                    case "SET":
-                        dataStore.Add(request[4], request[6]);
-                        break;
-                    case "GET":
-                        if (dataStore.TryGetValue(request[4], out string? value))
-                        {
-                            string response = BuildArrayString(["GET", request[4], value]);
-                            byte[] responseBytes = Encoding.ASCII.GetBytes(response);
-                            await Task.Run(() => clientSocket.Send(responseBytes));
-                        }
-                        break;
-                    default:
-                        Console.WriteLine("Unknown command received from master.");
-                        break;
+                    if (request.Length == 0)
+                    {
+                        Console.WriteLine("Invalid RESP format.");
+                        continue;
+                    }
+
+                    switch (request[0].ToUpper())
+                    {
+                        case "SET":
+                            if (request.Length >= 3)
+                            {
+                                dataStore.Add(request[1], request[2]);
+                                Console.WriteLine($"SET command received. Key: {request[1]}, Value: {request[2]}");
+                            }
+                            break;
+                        case "GET":
+                            if (request.Length >= 2)
+                            {
+                                if (dataStore.TryGetValue(request[1], out string? value))
+                                {
+                                    string response = BuildBulkString(value);
+                                    byte[] responseBytes = Encoding.ASCII.GetBytes(response);
+                                    await Task.Run(() => clientSocket.Send(responseBytes));
+                                }
+                                else
+                                {
+                                    byte[] responseBytes = Encoding.ASCII.GetBytes("$-1\r\n");
+                                    await Task.Run(() => clientSocket.Send(responseBytes));
+                                }
+                            }
+                            break;
+                        default:
+                            Console.WriteLine("Unknown command received from master.");
+                            break;
+                    }
                 }
             }
         }
@@ -481,4 +502,40 @@ public class Server
             clientSocket.Close();
         }
     }
+
+    static List<string[]> ParseRESP(string data)
+    {
+        var lines = data.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        var result = new List<string[]>();
+        var currentArray = new List<string>();
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("*"))
+            {
+                if (currentArray.Count > 0)
+                {
+                    result.Add(currentArray.ToArray());
+                    currentArray.Clear();
+                }
+            }
+            else if (lines[i].StartsWith("$"))
+            {
+                int length = int.Parse(lines[i].Substring(1));
+                if (i + 1 < lines.Length && lines[i + 1].Length == length)
+                {
+                    currentArray.Add(lines[i + 1]);
+                    i++; // Skip the next line as it is part of the bulk string
+                }
+            }
+        }
+
+        if (currentArray.Count > 0)
+        {
+            result.Add(currentArray.ToArray());
+        }
+
+        return result;
+    }
+
 }
