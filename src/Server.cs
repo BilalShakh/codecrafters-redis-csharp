@@ -183,7 +183,7 @@ public class Server
                 var responseData = Encoding.ASCII.GetString(data, 0, bytesRead);
             }
 
-            _ = Task.Run(() => HandleSlaveClient(tcpClient.Client));
+            _ = Task.Run(() => HandleClient(tcpClient.Client));
         }
         catch (Exception ex)
         {
