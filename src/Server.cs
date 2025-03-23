@@ -452,12 +452,11 @@ public class Server
                 string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
                 Console.WriteLine("Received data from master: " + receivedData);
 
-                var requests = ParseRESP(receivedData, out int totalBytes);
-                // Increment the offset after processing the request
-                MasterReplicationOffset += totalBytes;
+                var requests = ParseRESP(receivedData, out int[] requestBytes);
 
-                foreach (var request in requests)
+                for (int i = 0; i < requests.Count; i++)
                 {
+                    var request = requests[i];
                     if (request.Length == 0)
                     {
                         Console.WriteLine("Invalid RESP format.");
@@ -501,6 +500,9 @@ public class Server
                             Console.WriteLine("Unknown command received from master.");
                             break;
                     }
+
+                    // Increment the offset after processing the request
+                    MasterReplicationOffset += requestBytes[i];
                 }
             }
         }
@@ -517,18 +519,15 @@ public class Server
     static async Task SendResponse(Socket clientSocket, string response)
     {
         byte[] responseBytes = Encoding.ASCII.GetBytes(response);
-        if (!response.Contains("PONG"))
-        {
-            await Task.Run(() => clientSocket.Send(responseBytes));
-        }
+        await Task.Run(() => clientSocket.Send(responseBytes));
     }
 
-    static List<string[]> ParseRESP(string data, out int totalBytes)
+    static List<string[]> ParseRESP(string data, out int[] requestBytes)
     {
         var lines = data.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
         var result = new List<string[]>();
         var currentArray = new List<string>();
-        totalBytes = 0;
+        var bytesList = new List<int>();
 
         for (int i = 0; i < lines.Length; i++)
         {
@@ -539,16 +538,16 @@ public class Server
                     result.Add(currentArray.ToArray());
                     currentArray.Clear();
                 }
-                totalBytes += lines[i].Length + 2; // Include \r\n
+                bytesList.Add(lines[i].Length + 2); // Include \r\n
             }
             else if (lines[i].StartsWith("$"))
             {
                 int length = int.Parse(lines[i].Substring(1));
-                totalBytes += lines[i].Length + 2; // Include \r\n
+                bytesList[bytesList.Count - 1] += lines[i].Length + 2; // Include \r\n
                 if (i + 1 < lines.Length && lines[i + 1].Length == length)
                 {
                     currentArray.Add(lines[i + 1]);
-                    totalBytes += lines[i + 1].Length + 2; // Include \r\n
+                    bytesList[bytesList.Count - 1] += lines[i + 1].Length + 2; // Include \r\n
                     i++; // Skip the next line as it is part of the bulk string
                 }
             }
@@ -559,6 +558,7 @@ public class Server
             result.Add(currentArray.ToArray());
         }
 
+        requestBytes = bytesList.ToArray();
         return result;
     }
 
