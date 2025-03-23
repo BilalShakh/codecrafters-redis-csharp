@@ -89,6 +89,7 @@ namespace codecrafters_redis.src
                             case "PING":
                                 break;
                             case "SET":
+                                ReplicaRegistry.ReplicasFinished[key] = false;
                                 if (request.Length >= 3)
                                 {
                                     MasterClient.dataStore[request[1]] = request[2];
