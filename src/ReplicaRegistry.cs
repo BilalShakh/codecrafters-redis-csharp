@@ -12,6 +12,7 @@ namespace codecrafters_redis.src
         {
             Replicas[key] = value;
             ReplicasFinished[key] = true;
+            BytesPropogated[key] = 0;
         }
     }
 }
