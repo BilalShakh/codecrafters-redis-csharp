@@ -454,14 +454,6 @@ public class Server
 
                 var requests = ParseRESP(receivedData, out int[] requestBytes);
 
-                Console.WriteLine(String.Join(", ", requestBytes));
-
-                if (requests.Count != requestBytes.Length)
-                {
-                    Console.WriteLine($"Mismatch between requests and requestBytes length. requests.Count:{requests.Count} requestBytes.Length:{requestBytes.Length}");
-                    continue;
-                }
-
                 for (int i = 0; i < requests.Count; i++)
                 {
                     var request = requests[i];
@@ -508,8 +500,6 @@ public class Server
                             Console.WriteLine("Unknown command received from master.");
                             break;
                     }
-
-                    // Increment the offset after processing the request
                     MasterReplicationOffset += requestBytes[i];
                 }
             }
@@ -563,11 +553,6 @@ public class Server
             else if (lines[i].StartsWith("$"))
             {
                 int length = int.Parse(lines[i].Substring(1));
-                if (bytesList.Count == 0)
-                {
-                    // If bytesList is empty, it means we encountered a bulk string without an array prefix
-                    continue;
-                }
                 bytesList[bytesList.Count - 1] += lines[i].Length + 2; // Include \r\n
                 if (i + 1 < lines.Length && lines[i + 1].Length == length)
                 {
