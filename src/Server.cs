@@ -600,8 +600,8 @@ public class Server
         }
 
         requestBytes = bytes.ToArray();
-        Console.WriteLine("Parsed RESP: " + string.Join(",", result));
-        Console.WriteLine("Request Bytes: " + string.Join(",", requestBytes));
+        Console.WriteLine("Parsed RESP: " + string.Join(", ", result.Select(r => "[" + string.Join(", ", r) + "]")));
+        Console.WriteLine("Request Bytes: " + string.Join(", ", requestBytes));
         return result;
     }
 
