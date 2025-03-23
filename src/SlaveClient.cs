@@ -7,7 +7,6 @@ namespace codecrafters_redis.src
     {
         private static string MasterHost = string.Empty;
         private static int MasterPort = 0;
-        private static int SlaveReplicationOffset = 0;
 
         public SlaveClient(string masterHost, int masterPort)
         {
@@ -114,7 +113,7 @@ namespace codecrafters_redis.src
                                 {
                                     Console.WriteLine($"REPLCONF command received. Key: {request[1]}, Value: {request[2]}, ReplicaRegistryKey: {key}");
                                 }
-                                string replconfResponse = Utilities.BuildArrayString(["REPLCONF", "ACK", SlaveReplicationOffset.ToString()]);
+                                string replconfResponse = Utilities.BuildArrayString(["REPLCONF", "ACK", MasterClient.MasterReplicationOffset.ToString()]);
                                 ReplicaRegistry.ReplicasFinished[key] = requestBytes.Sum() >= bytesRead;
                                 await SendResponse(clientSocket, replconfResponse);
                                 break;
@@ -122,7 +121,7 @@ namespace codecrafters_redis.src
                                 Console.WriteLine("Unknown command received from master.");
                                 break;
                         }
-                        SlaveReplicationOffset += requestBytes[i];
+                        MasterClient.MasterReplicationOffset += requestBytes[i];
                     }
                     ReplicaRegistry.ReplicasFinished[key] = true;
                 }

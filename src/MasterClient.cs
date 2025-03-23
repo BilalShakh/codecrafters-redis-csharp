@@ -8,7 +8,7 @@ namespace codecrafters_redis.src
     {
         public static readonly Dictionary<string, string> dataStore = [];
         private static string MasterReplicationId = string.Empty;
-        private static int MasterReplicationOffset = 0;
+        public static int MasterReplicationOffset = 0;
         private static string MasterHost = string.Empty;
         private static int MasterPort = 0;
         private static string RDBFileDirectory = string.Empty;
