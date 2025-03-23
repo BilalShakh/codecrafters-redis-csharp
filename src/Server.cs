@@ -450,8 +450,9 @@ public class Server
                     break;
                 }
                 int index = 0;
-                if (bytesRead > 120)
+                if (bytesRead > 120 && isEmptyRDB(buffer))
                 {
+                    Console.WriteLine("Empty RDB file received from master.");
                     index = 119;
                 }
                 string receivedData = Encoding.ASCII.GetString(buffer, index, bytesRead).Trim();
@@ -608,4 +609,33 @@ public class Server
         Console.WriteLine("Request Bytes: " + string.Join(", ", requestBytes));
         return result;
     }
+
+    static bool isEmptyRDB(byte[] data)
+    {
+        // The base64 string to search for
+        const string base64String = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==";
+
+        // Convert the base64 string to a byte array
+        byte[] base64Bytes = Convert.FromBase64String(base64String);
+
+        // Search for the base64 byte array in the data byte array
+        for (int i = 0; i <= data.Length - base64Bytes.Length; i++)
+        {
+            bool found = true;
+            for (int j = 0; j < base64Bytes.Length; j++)
+            {
+                if (data[i + j] != base64Bytes[j])
+                {
+                    found = false;
+                    break;
+                }
+            }
+            if (found)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }
