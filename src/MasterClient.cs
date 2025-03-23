@@ -128,7 +128,7 @@ namespace codecrafters_redis.src
                             response = "+FULLRESYNC " + MasterReplicationId + " " + MasterReplicationOffset + "\r\n";
                             break;
                         case "WAIT":
-                            int responseCount = await HandleWaitAsync(request);
+                            int responseCount = await HandleWaitAsync(ParseWaitInput(request));
                             response = Utilities.BuildIntegerString(responseCount);
                             break;
                         default:
@@ -162,6 +162,15 @@ namespace codecrafters_redis.src
             {
                 clientSocket.Close();
             }
+        }
+
+        private static string[] ParseWaitInput(string[] input)
+        {
+            string[] parsedInput = new string[3];
+            parsedInput[0] = input[2];
+            parsedInput[1] = input[4];
+            parsedInput[2] = input[6];
+            return parsedInput;
         }
 
         private static async Task<int> HandleWaitAsync(string[] input)
