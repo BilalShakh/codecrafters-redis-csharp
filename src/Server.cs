@@ -528,6 +528,8 @@ public class Server
         var bytesList = new List<int>();
         bool validDataStarted = false;
 
+        Console.WriteLine("Lines: " + string.Join(",", lines));
+
         for (int i = 0; i < lines.Length; i++)
         {
             if (lines[i].StartsWith("*") || lines[i].StartsWith("$"))
@@ -570,7 +572,7 @@ public class Server
                     }
                     else
                     {
-                        bytesList[bytesList.Count - 1] += lines[i].Length + 2; // Include \r\n
+                        bytesList[bytesList.Count - 1] += lines[i].Length + 4; // Include \r\n
                     }
                     i++; // Skip the next line as it is part of the bulk string
                 }
