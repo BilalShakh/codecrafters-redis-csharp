@@ -142,9 +142,6 @@ public class Server
                     byte[] RDBBytes = CreateEmptyRDBFile();
                     await Task.Run(() => clientSocket.Send(RDBBytes));
                     slaveSockets.Add(clientSocket);
-
-                    string slaveGetAck = BuildArrayString(["REPLCONF", "GETACK", "*"]);
-                    await Task.Run(() => clientSocket.Send(Encoding.ASCII.GetBytes(slaveGetAck)));
                 }
             }
         }
