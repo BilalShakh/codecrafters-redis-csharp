@@ -140,8 +140,8 @@ public class Server
                 if (request[2] == "PSYNC")
                 {
                     byte[] RDBBytes = CreateEmptyRDBFile();
-                    await Task.Run(() => clientSocket.Send(RDBBytes));
                     slaveSockets.Add(clientSocket);
+                    await Task.Run(() => clientSocket.Send(RDBBytes));
                 }
             }
         }
