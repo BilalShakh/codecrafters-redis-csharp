@@ -115,7 +115,14 @@ namespace codecrafters_redis.src
                                     Console.WriteLine($"REPLCONF command received. Key: {request[1]}, Value: {request[2]}, ReplicaRegistryKey: {key}");
                                 }
                                 string replconfResponse = Utilities.BuildArrayString(["REPLCONF", "ACK", MasterClient.MasterReplicationOffset.ToString()]);
-                                ReplicaRegistry.ReplicasFinished[key] = ReplicaRegistry.BytesPropogated[key] >= MasterClient.MasterReplicationOffset;
+                                
+                                int thisAckBytes = int.Parse(request[2]);
+
+                                if (thisAckBytes == MasterClient.MasterReplicationOffset)
+                                {
+                                    MasterClient.inSyncReplicas.Add(clientSocket);
+                                }
+
                                 await SendResponse(clientSocket, replconfResponse);
                                 break;
                             default:

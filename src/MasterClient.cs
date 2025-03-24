@@ -1,7 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace codecrafters_redis.src
 {
@@ -15,6 +14,7 @@ namespace codecrafters_redis.src
         private static string RDBFileDirectory = string.Empty;
         private static string RDBFileName = string.Empty;
         private static readonly List<Socket> slaveSockets = [];
+        public static readonly List<Socket> inSyncReplicas = [];
         private static int Port = 6379;
 
 
@@ -129,7 +129,7 @@ namespace codecrafters_redis.src
                             response = "+FULLRESYNC " + MasterReplicationId + " " + MasterReplicationOffset + "\r\n";
                             break;
                         case "WAIT":
-                            int responseCount = await HandleWaitAsync(ParseWaitInput(request));
+                            int responseCount = HandleWait(ParseWaitInput(request));
                             response = Utilities.BuildIntegerString(responseCount);
                             break;
                         default:
@@ -187,7 +187,7 @@ namespace codecrafters_redis.src
             }
         }
 
-        private static async Task<int> HandleWaitAsync(string[] input)
+        private static int HandleWait(string[] input)
         {
             if (input.Length != 3)
             {
@@ -196,44 +196,33 @@ namespace codecrafters_redis.src
 
             int replicaCount = int.Parse(input[1]);
             int timeout = int.Parse(input[2]);
-            HashSet<Socket> replicasWithUpdate = new();
-            var expireTime = DateTime.Now.AddMilliseconds(timeout);
-
-            Console.WriteLine($"replicaCount = {replicaCount}, expireTime = {expireTime}");
-
-            foreach (var replica in ReplicaRegistry.Replicas)
+            
+            if (slaveSockets.Count == 0)
             {
-                int key = replica.Key;
-                if (!ReplicaRegistry.ReplicasFinished[key])
-                {
-                    string replConfRequest = Utilities.BuildArrayString(["REPLCONF", "GETACK", "*"]);
-                    byte[] replConfData = Encoding.ASCII.GetBytes(replConfRequest);
-                    await Task.Run(() => replica.Value.Send(replConfData));
-                }
-                else
-                {
-                    replicasWithUpdate.Add(replica.Value);
-                }
+                return slaveSockets.Count;
             }
 
-            while (DateTime.Now < expireTime && replicasWithUpdate.Count < replicaCount)
+            if (MasterReplicationOffset == 0)
             {
-                foreach (var replica in ReplicaRegistry.Replicas)
-                {
-                    if (replicasWithUpdate.Count >= replicaCount)
-                        break;
-
-                    if (replicasWithUpdate.Contains(replica.Value))
-                        continue;
-
-                    if (ReplicaRegistry.ReplicasFinished[replica.Key])
-                    {
-                        replicasWithUpdate.Add(replica.Value);
-                    }
-                }
+                Thread.Sleep(timeout);
+                return slaveSockets.Count;
             }
 
-            return replicasWithUpdate.Count;
+            foreach (var replica in slaveSockets)
+            {
+                replica.ReceiveTimeout = timeout;
+                SendResponse(Utilities.BuildArrayString(["REPLCONF", "GETACK", "*"]), replica);
+            }
+
+            Console.WriteLine("Waiting for replicas to catch up.");
+            Thread.Sleep(timeout);
+            return inSyncReplicas.Count;
+        }
+
+        static void SendResponse(string response, Socket socket)
+        {
+            byte[] responseBytes = Encoding.ASCII.GetBytes(response);
+            socket.Send(responseBytes);
         }
 
         static async Task HandleExpiry(int timeToExpire, string key)
