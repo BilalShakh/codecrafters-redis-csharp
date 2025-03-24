@@ -1,4 +1,5 @@
-﻿using System.Net.Sockets;
+﻿using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 namespace codecrafters_redis.src
@@ -7,12 +8,23 @@ namespace codecrafters_redis.src
     {
         private static string MasterHost = string.Empty;
         private static int MasterPort = 0;
+        private static int SlaveOffset = 0;
+        private static IPEndPoint? _leaderIPEndpoint;
 
         public SlaveClient(string masterHost, int masterPort)
         {
             MasterHost = masterHost;
             MasterPort = masterPort;
+            _leaderIPEndpoint = GetIPEndPoint(masterHost, masterPort);
             HandleMasterHandshake();
+        }
+
+        static IPEndPoint GetIPEndPoint(string host, int port)
+        {
+            IPHostEntry ipHostInfo = Dns.GetHostEntry(host);
+            IPAddress ipAddress = ipHostInfo.AddressList[0];
+            IPEndPoint ipEndPoint = new(ipAddress, port);
+            return ipEndPoint;
         }
 
         static void HandleMasterHandshake()
@@ -87,6 +99,14 @@ namespace codecrafters_redis.src
                         switch (request[0].ToUpper())
                         {
                             case "PING":
+                                if (_CheckIfConnectionIsFromLeader(clientSocket))
+                                {
+                                    SlaveOffset += requestBytes[i];
+                                }
+                                else
+                                {
+                                    await SendResponse(clientSocket, "+PONG\r\n");
+                                }
                                 break;
                             case "SET":
                                 ReplicaRegistry.ReplicasFinished[key] = false;
@@ -95,6 +115,14 @@ namespace codecrafters_redis.src
                                     MasterClient.dataStore[request[1]] = request[2];
                                     Console.WriteLine($"SET command received. Key: {request[1]}, Value: {request[2]}");
                                 }
+                                if (_CheckIfConnectionIsFromLeader(clientSocket))
+                                {
+                                    //if a slave recieves a set from a master 
+                                    // dont need a response but we track the number of bytes
+                                    SlaveOffset += requestBytes[i];
+                                    continue;
+                                }
+                                await SendResponse(clientSocket, "+OK\r\n");
                                 break;
                             case "GET":
                                 if (request.Length >= 2)
@@ -114,15 +142,26 @@ namespace codecrafters_redis.src
                                 {
                                     Console.WriteLine($"REPLCONF command received. Key: {request[1]}, Value: {request[2]}, ReplicaRegistryKey: {key}");
                                 }
-                                string replconfResponse = Utilities.BuildArrayString(["REPLCONF", "ACK", MasterClient.MasterReplicationOffset.ToString()]);
-                                
-                                int thisAckBytes = int.Parse(request[2]);
+                                string replconfResponse = Utilities.BuildArrayString(["REPLCONF", "ACK", SlaveOffset.ToString()]);
 
-                                if (thisAckBytes == MasterClient.MasterReplicationOffset)
+                                if (request[1] == "ACK")
                                 {
-                                    MasterClient.inSyncReplicas.Add(clientSocket);
+                                    int thisAckBytes = int.Parse(request[2]);
+
+                                    if (thisAckBytes == MasterClient.MasterReplicationOffset)
+                                    {
+                                        MasterClient.inSyncReplicas.Add(clientSocket);
+                                    }
+
+                                    MasterClient.MasterReplicationOffset += 37;
                                 }
 
+                                if (request[1] == "GETACK" && _CheckIfConnectionIsFromLeader(clientSocket))
+                                {
+                                    //if a slave recieves a set from a master 
+                                    // dont need a response but we track the number of bytes
+                                    SlaveOffset += requestBytes[i];
+                                }
                                 await SendResponse(clientSocket, replconfResponse);
                                 break;
                             default:
@@ -233,6 +272,11 @@ namespace codecrafters_redis.src
         {
             byte[] responseBytes = Encoding.ASCII.GetBytes(response);
             await Task.Run(() => clientSocket.Send(responseBytes));
+        }
+
+        private static bool _CheckIfConnectionIsFromLeader(Socket connection)
+        {
+            return connection.RemoteEndPoint.GetHashCode() == _leaderIPEndpoint.GetHashCode();
         }
     }
 }

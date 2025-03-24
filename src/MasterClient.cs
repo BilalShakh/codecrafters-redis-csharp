@@ -59,7 +59,7 @@ namespace codecrafters_redis.src
                     }
                     string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
                     var request = receivedData.Split("\r\n");
-                    Console.WriteLine("Received data: " + receivedData);
+                    Console.WriteLine("Master Received data: " + receivedData);
 
                     string response = string.Empty;
                     switch (request[2])
@@ -124,12 +124,31 @@ namespace codecrafters_redis.src
                             break;
                         case "REPLCONF":
                             response = "+OK\r\n";
+                            if (request[4] == "listening-port")
+                            {
+                                slaveSockets.Add(clientSocket);
+                            }
+                            else if (request[4] == "ACK")
+                            {
+                                response = string.Empty;
+                                Console.WriteLine("Handling Master REPLCONF ACK command.");
+                                int thisAckBytes = int.Parse(request[6]);
+
+                                if (thisAckBytes == MasterReplicationOffset)
+                                {
+                                    inSyncReplicas.Add(clientSocket);
+                                }
+
+                                MasterReplicationOffset += 37;
+                            }
                             break;
                         case "PSYNC":
                             response = "+FULLRESYNC " + MasterReplicationId + " " + MasterReplicationOffset + "\r\n";
                             break;
                         case "WAIT":
-                            int responseCount = HandleWait(ParseWaitInput(request));
+                            Console.WriteLine("Handling WAIT command.");
+                            int responseCount = await HandleWait(ParseWaitInput(request));
+                            Console.WriteLine("Master Response count: " + responseCount);
                             response = Utilities.BuildIntegerString(responseCount);
                             break;
                         default:
@@ -137,8 +156,12 @@ namespace codecrafters_redis.src
                             break;
                     }
 
-                    byte[] responseBytes = Encoding.ASCII.GetBytes(response);
-                    await Task.Run(() => clientSocket.Send(responseBytes));
+                    Console.WriteLine("Master Response: " + response);
+                    if (response != string.Empty)
+                    {
+                        byte[] responseBytes = Encoding.ASCII.GetBytes(response);
+                        await Task.Run(() => clientSocket.Send(responseBytes));
+                    }
 
                     if (request[2] == "SET")
                     {
@@ -153,7 +176,6 @@ namespace codecrafters_redis.src
                     if (request[2] == "PSYNC")
                     {
                         byte[] RDBBytes = CreateEmptyRDBFile();
-                        slaveSockets.Add(clientSocket);
                         ReplicaRegistry.RegisterReplica(slaveSockets.Count - 1, clientSocket);
                         await Task.Run(() => clientSocket.Send(RDBBytes));
                     }
@@ -187,7 +209,7 @@ namespace codecrafters_redis.src
             }
         }
 
-        private static int HandleWait(string[] input)
+        private static async Task<int> HandleWait(string[] input)
         {
             if (input.Length != 3)
             {
@@ -199,12 +221,14 @@ namespace codecrafters_redis.src
             
             if (slaveSockets.Count == 0)
             {
+                Console.WriteLine("No replicas connected.");
                 return slaveSockets.Count;
             }
 
             if (MasterReplicationOffset == 0)
             {
-                Thread.Sleep(timeout);
+                Console.WriteLine("Master has not yet received any data.");
+                await Task.Delay(timeout);
                 return slaveSockets.Count;
             }
 
@@ -215,7 +239,7 @@ namespace codecrafters_redis.src
             }
 
             Console.WriteLine("Waiting for replicas to catch up.");
-            Thread.Sleep(timeout);
+            await Task.Delay(timeout);
             return inSyncReplicas.Count;
         }
 
@@ -233,12 +257,13 @@ namespace codecrafters_redis.src
 
         static void SendToSlaves(string data)
         {
-            Console.WriteLine("Sending data to slaves: " + data);
+            Console.WriteLine($"Sending data to {slaveSockets.Count} slaves: " + data);
+            byte[] responseBytes = Encoding.ASCII.GetBytes(data);
             foreach (var slaveSocket in slaveSockets)
             {
-                byte[] responseBytes = Encoding.ASCII.GetBytes(data);
                 slaveSocket.Send(responseBytes);
             }
+            MasterReplicationOffset += responseBytes.Length;
         }
 
         static byte[] CreateEmptyRDBFile()
