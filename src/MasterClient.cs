@@ -166,17 +166,12 @@ namespace codecrafters_redis.src
                     if (request[2] == "SET")
                     {
                         string slaveResponse = Utilities.BuildArrayString(["SET", request[4], request[6]]);
-                        if (MasterHost == string.Empty)
-                        {
-                            UpdateAllSubscribersAsync(slaveResponse);
-                        }
                         SendToSlaves(slaveResponse);
                     }
 
                     if (request[2] == "PSYNC")
                     {
                         byte[] RDBBytes = CreateEmptyRDBFile();
-                        ReplicaRegistry.RegisterReplica(slaveSockets.Count - 1, clientSocket);
                         await Task.Run(() => clientSocket.Send(RDBBytes));
                     }
                 }
@@ -195,18 +190,6 @@ namespace codecrafters_redis.src
         {
             string[] parsedInput = [input[2], input[4], input[6]];
             return parsedInput;
-        }
-
-        private static void UpdateAllSubscribersAsync(string data)
-        {
-            var bytesTosend = Encoding.UTF8.GetBytes(data);
-
-            foreach (var item in ReplicaRegistry.Replicas)
-            {
-                int key = item.Key;
-                ReplicaRegistry.BytesPropogated[key] += bytesTosend.Length;
-                ReplicaRegistry.ReplicasFinished[key] = false;
-            }
         }
 
         private static async Task<int> HandleWait(string[] input)
