@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using codecrafters_redis.src.Data;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
@@ -7,6 +8,7 @@ namespace codecrafters_redis.src
     class MasterClient
     {
         public static readonly Dictionary<string, string> dataStore = [];
+        public static readonly Dictionary<string, StreamEntry> streamStore = [];
         private static string MasterReplicationId = string.Empty;
         public static int MasterReplicationOffset = 0;
         private static string MasterHost = string.Empty;
@@ -156,10 +158,24 @@ namespace codecrafters_redis.src
                             {
                                 response = Utilities.BuildBulkString("string");
                             }
+                            else if (streamStore.ContainsKey(request[4]))
+                            {
+                                response = Utilities.BuildBulkString("stream");
+                            }
                             else
                             {
                                 response = Utilities.BuildBulkString("none");
                             }
+                            break;
+                        case "XADD":
+                            string Key = request[4];
+                            if (!streamStore.ContainsKey(Key))
+                            {
+                                streamStore.Add(Key, new StreamEntry { StreamKey = request[6], StreamStore = [] });
+                            }
+                            string streamEntryId = "test";
+                            streamStore[Key].StreamStore.Add(streamEntryId, new() { { "id", streamEntryId }, { "data", streamEntryId } });
+                            response = Utilities.BuildBulkString(request[6]);
                             break;
                         default:
                             response = "-ERR unknown command\r\n";
@@ -200,6 +216,13 @@ namespace codecrafters_redis.src
         {
             string[] parsedInput = [input[2], input[4], input[6]];
             return parsedInput;
+        }
+
+        private static string[][] ParseStreamInput(string[] input)
+        {
+            int inputLength = int.Parse(input[0].Replace("$",""));
+            Console.WriteLine("Input length: " + inputLength);
+            return new string[inputLength][];
         }
 
         private static async Task<int> HandleWait(string[] input)
