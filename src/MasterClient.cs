@@ -174,9 +174,10 @@ namespace codecrafters_redis.src
                                 streamStore.Add(Key, new StreamEntry { Store = [] });
                             }
                             string streamEntryId = request[6];
-                            if (!IsStreamEntryIdValid(streamEntryId, Key))
+                            string errorMessage = string.Empty;
+                            if (!IsStreamEntryIdValid(streamEntryId, Key, out errorMessage))
                             {
-                                response = Utilities.BuildErrorString("The ID specified in XADD is equal or smaller than the target stream top item");
+                                response = Utilities.BuildErrorString(errorMessage);
                                 break;
                             }
                             streamStore[Key].Store.Add(streamEntryId, []);
@@ -244,9 +245,22 @@ namespace codecrafters_redis.src
             return res;
         }
 
-        public static bool IsStreamEntryIdValid(string streamEntryId, string streamKey)
+        public static bool IsStreamEntryIdValid(string streamEntryId, string streamKey, out string errorMessage)
         {
+            errorMessage = string.Empty;
+            if (streamEntryId == "0-0")
+            {
+                errorMessage = "The ID specified in XADD must be greater than 0-0";
+                return false;
+            }
+
             string[] streamEntryIds = streamStore[streamKey].Store.Keys.ToArray();
+
+            if (streamEntryIds.Length == 0)
+            {
+                return true;
+            }
+
             string lastStreamEntryId = streamEntryIds[streamEntryIds.Length - 1];
             string[] lastStreamEntryIdParts = lastStreamEntryId.Split("-");
             string[] streamEntryIdParts = streamEntryId.Split("-");
@@ -255,18 +269,15 @@ namespace codecrafters_redis.src
             int lastStreamEntryIdSeq = int.Parse(lastStreamEntryIdParts[1]);
             int streamEntryIdSeq = int.Parse(streamEntryIdParts[1]);
             
-            if (streamEntryId == "0-0")
-            {
-                return false;
-            }
-            
             if (streamEntryIdTime < lastStreamEntryIdTime)
             {
+                errorMessage = "The ID specified in XADD is equal or smaller than the target stream top item";
                 return false;
             }
             
             if (streamEntryIdTime == lastStreamEntryIdTime && streamEntryIdSeq <= lastStreamEntryIdSeq)
             {
+                errorMessage = "The ID specified in XADD is equal or smaller than the target stream top item";
                 return false;
             }
 
