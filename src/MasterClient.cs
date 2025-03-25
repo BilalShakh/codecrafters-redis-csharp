@@ -174,6 +174,11 @@ namespace codecrafters_redis.src
                                 streamStore.Add(Key, new StreamEntry { Store = [] });
                             }
                             string streamEntryId = request[6];
+                            if (!IsStreamEntryIdValid(streamEntryId, Key))
+                            {
+                                response = Utilities.BuildErrorString("The ID specified in XADD is equal or smaller than the target stream top item");
+                                break;
+                            }
                             streamStore[Key].Store.Add(streamEntryId, []);
                             string[][] keyValuePairs = ParseStreamKeyValuePairs(request);
                             foreach (var pair in keyValuePairs)
@@ -237,6 +242,35 @@ namespace codecrafters_redis.src
             }
             Console.WriteLine("Parsed Stream Key Value Pairs: " + res);
             return res;
+        }
+
+        public static bool IsStreamEntryIdValid(string streamEntryId, string streamKey)
+        {
+            string[] streamEntryIds = streamStore[streamKey].Store.Keys.ToArray();
+            string lastStreamEntryId = streamEntryIds[streamEntryIds.Length - 1];
+            string[] lastStreamEntryIdParts = lastStreamEntryId.Split("-");
+            string[] streamEntryIdParts = streamEntryId.Split("-");
+            int lastStreamEntryIdTime = int.Parse(lastStreamEntryIdParts[0]);
+            int streamEntryIdTime = int.Parse(streamEntryIdParts[0]);
+            int lastStreamEntryIdSeq = int.Parse(lastStreamEntryIdParts[1]);
+            int streamEntryIdSeq = int.Parse(streamEntryIdParts[1]);
+            
+            if (streamEntryId == "0-0")
+            {
+                return false;
+            }
+            
+            if (streamEntryIdTime < lastStreamEntryIdTime)
+            {
+                return false;
+            }
+            
+            if (streamEntryIdTime == lastStreamEntryIdTime && streamEntryIdSeq <= lastStreamEntryIdSeq)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private static async Task<int> HandleWait(string[] input)

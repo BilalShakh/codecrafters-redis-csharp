@@ -24,6 +24,11 @@ namespace codecrafters_redis.src
             return $":{value}\r\n";
         }
 
+        public static string BuildErrorString(string message)
+        {
+            return $"-ERR {message}\r\n";
+        }
+
         public static string Generate40CharacterGuid()
         {
             string guid = Guid.NewGuid().ToString("N"); // 32 characters
