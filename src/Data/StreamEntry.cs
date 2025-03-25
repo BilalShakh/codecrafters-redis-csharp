@@ -2,7 +2,6 @@
 {
     class StreamEntry
     {
-        public string StreamKey { get; set; }
-        public Dictionary<string, Dictionary<string, string>> StreamStore { get; set; }
+        public Dictionary<string, Dictionary<string, string>> Store { get; set; }
     }
 }

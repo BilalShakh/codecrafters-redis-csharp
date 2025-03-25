@@ -171,10 +171,16 @@ namespace codecrafters_redis.src
                             string Key = request[4];
                             if (!streamStore.ContainsKey(Key))
                             {
-                                streamStore.Add(Key, new StreamEntry { StreamKey = request[6], StreamStore = [] });
+                                streamStore.Add(Key, new StreamEntry { Store = [] });
                             }
-                            string streamEntryId = "test";
-                            streamStore[Key].StreamStore.Add(streamEntryId, new() { { "id", streamEntryId }, { "data", streamEntryId } });
+                            string streamEntryId = request[6];
+                            streamStore[Key].Store.Add(streamEntryId, []);
+                            string[][] keyValuePairs = ParseStreamKeyValuePairs(request);
+                            foreach (var pair in keyValuePairs)
+                            {
+                                Console.WriteLine("Added Key: " + pair[0] + " Value: " + pair[1]);
+                                streamStore[Key].Store[streamEntryId].Add(pair[0], pair[1]);
+                            }
                             response = Utilities.BuildBulkString(request[6]);
                             break;
                         default:
@@ -218,11 +224,19 @@ namespace codecrafters_redis.src
             return parsedInput;
         }
 
-        private static string[][] ParseStreamInput(string[] input)
+        private static string[][] ParseStreamKeyValuePairs(string[] input)
         {
-            int inputLength = int.Parse(input[0].Replace("$",""));
+            int inputLength = int.Parse(input[0].Replace("*",""));
+            string[][] res = new string[(inputLength-3)/2][];
             Console.WriteLine("Input length: " + inputLength);
-            return new string[inputLength][];
+            int j = 0;
+            for (int i = 7; i < input.Length; i+=4)
+            {
+                res[j] = [input[i + 1], input[i + 3]];
+                j++;
+            }
+            Console.WriteLine("Parsed Stream Key Value Pairs: " + res);
+            return res;
         }
 
         private static async Task<int> HandleWait(string[] input)
