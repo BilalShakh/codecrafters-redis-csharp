@@ -142,18 +142,6 @@ namespace codecrafters_redis.src
                                 }
                                 string replconfResponse = Utilities.BuildArrayString(["REPLCONF", "ACK", SlaveOffset.ToString()]);
 
-                                if (request[1] == "ACK")
-                                {
-                                    int thisAckBytes = int.Parse(request[2]);
-
-                                    if (thisAckBytes == MasterClient.MasterReplicationOffset)
-                                    {
-                                        MasterClient.inSyncReplicas.Add(clientSocket);
-                                    }
-
-                                    MasterClient.MasterReplicationOffset += 37;
-                                }
-
                                 if (request[1] == "GETACK" && _CheckIfConnectionIsFromLeader(clientSocket))
                                 {
                                     //if a slave recieves a set from a master 
@@ -166,7 +154,6 @@ namespace codecrafters_redis.src
                                 Console.WriteLine("Unknown command received from master.");
                                 break;
                         }
-                        MasterClient.MasterReplicationOffset += requestBytes[i];
                     }
                 }
             }

@@ -151,6 +151,16 @@ namespace codecrafters_redis.src
                             Console.WriteLine("Master Response count: " + responseCount);
                             response = Utilities.BuildIntegerString(responseCount);
                             break;
+                        case "TYPE":
+                            if (dataStore.ContainsKey(request[4]))
+                            {
+                                response = Utilities.BuildBulkString("string");
+                            }
+                            else
+                            {
+                                response = Utilities.BuildBulkString("none");
+                            }
+                            break;
                         default:
                             response = "-ERR unknown command\r\n";
                             break;
