@@ -168,30 +168,7 @@ namespace codecrafters_redis.src
                             }
                             break;
                         case "XADD":
-                            string Key = request[4];
-                            if (!streamStore.ContainsKey(Key))
-                            {
-                                streamStore.Add(Key, new StreamEntry { Store = [] });
-                            }
-                            string streamEntryId = request[6];
-                            string errorMessage = string.Empty;
-                            if (streamEntryId.Contains("*"))
-                            {
-                                streamEntryId = GenerateStreamEntryId(streamEntryId, Key);
-                            }
-                            if (!IsStreamEntryIdValid(streamEntryId, Key, out errorMessage))
-                            {
-                                response = Utilities.BuildErrorString(errorMessage);
-                                break;
-                            }
-                            streamStore[Key].Store.Add(streamEntryId, []);
-                            string[][] keyValuePairs = ParseStreamKeyValuePairs(request);
-                            foreach (var pair in keyValuePairs)
-                            {
-                                Console.WriteLine("Added Key: " + pair[0] + " Value: " + pair[1]);
-                                streamStore[Key].AddToStore(streamEntryId, pair[0], pair[1]);
-                            }
-                            response = Utilities.BuildBulkString(streamEntryId);
+                            response = HandleXADD(request);
                             break;
                         default:
                             response = "-ERR unknown command\r\n";
@@ -248,6 +225,24 @@ namespace codecrafters_redis.src
             }
             Console.WriteLine("Parsed Stream Key Value Pairs: " + res);
             return res;
+        }
+
+        private static string GenerateEntireStreamEntryId(string streamKey)
+        {
+            string time = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+
+            if (streamStore[streamKey].Store.Count == 0)
+            {
+                return $"{time}-0";
+            }
+
+            string lastStreamEntryId = streamStore[streamKey].Store.Keys.Last();
+            string[] lastStreamEntryIdParts = lastStreamEntryId.Split("-");
+            int lastStreamEntryIdSeq = int.Parse(lastStreamEntryIdParts[1]);
+
+            return lastStreamEntryIdParts[0] == time
+                ? $"{time}-{lastStreamEntryIdSeq + 1}"
+                : $"{time}-0";
         }
 
         private static string GenerateStreamEntryId(string streamEntryId, string streamKey)
@@ -307,6 +302,42 @@ namespace codecrafters_redis.src
             }
 
             return true;
+        }
+
+        private static string HandleXADD(string[] input)
+        {
+            string Key = input[4];
+            
+            if (!streamStore.ContainsKey(Key))
+            {
+                streamStore.Add(Key, new StreamEntry { Store = [] });
+            }
+            
+            string streamEntryId = input[6];
+            string errorMessage = string.Empty;
+            
+            if (streamEntryId == "*")
+            {
+                streamEntryId = GenerateEntireStreamEntryId(Key);
+            } 
+            else if (streamEntryId.Contains("*"))
+            {
+                streamEntryId = GenerateStreamEntryId(streamEntryId, Key);
+            }
+            
+            if (!IsStreamEntryIdValid(streamEntryId, Key, out errorMessage))
+            {
+                return Utilities.BuildErrorString(errorMessage);
+            }
+            
+            streamStore[Key].Store.Add(streamEntryId, []);
+            string[][] keyValuePairs = ParseStreamKeyValuePairs(input);
+            foreach (var pair in keyValuePairs)
+            {
+                Console.WriteLine("Added Key: " + pair[0] + " Value: " + pair[1]);
+                streamStore[Key].AddToStore(streamEntryId, pair[0], pair[1]);
+            }
+            return Utilities.BuildBulkString(streamEntryId);
         }
 
         private static async Task<int> HandleWait(string[] input)
