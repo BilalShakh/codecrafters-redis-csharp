@@ -175,6 +175,10 @@ namespace codecrafters_redis.src
                             }
                             string streamEntryId = request[6];
                             string errorMessage = string.Empty;
+                            if (streamEntryId.Contains("*"))
+                            {
+                                streamEntryId = GenerateStreamEntryId(streamEntryId, Key);
+                            }
                             if (!IsStreamEntryIdValid(streamEntryId, Key, out errorMessage))
                             {
                                 response = Utilities.BuildErrorString(errorMessage);
@@ -185,9 +189,9 @@ namespace codecrafters_redis.src
                             foreach (var pair in keyValuePairs)
                             {
                                 Console.WriteLine("Added Key: " + pair[0] + " Value: " + pair[1]);
-                                streamStore[Key].Store[streamEntryId].Add(pair[0], pair[1]);
+                                streamStore[Key].AddToStore(streamEntryId, pair[0], pair[1]);
                             }
-                            response = Utilities.BuildBulkString(request[6]);
+                            response = Utilities.BuildBulkString(streamEntryId);
                             break;
                         default:
                             response = "-ERR unknown command\r\n";
@@ -217,6 +221,7 @@ namespace codecrafters_redis.src
             catch (Exception ex)
             {
                 Console.WriteLine($"Error handling client: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
             }
             finally
             {
@@ -243,6 +248,26 @@ namespace codecrafters_redis.src
             }
             Console.WriteLine("Parsed Stream Key Value Pairs: " + res);
             return res;
+        }
+
+        private static string GenerateStreamEntryId(string streamEntryId, string streamKey)
+        {
+            string[] streamEntryIdParts = streamEntryId.Split("-");
+            int streamEntryIdTime = int.Parse(streamEntryIdParts[0]);
+
+            if (streamStore[streamKey].Store.Count == 0)
+            {
+                return streamEntryIdTime == 0 ? "0-1" : $"{streamEntryIdTime}-0";
+            }
+
+            string lastStreamEntryId = streamStore[streamKey].Store.Keys.Last();
+            string[] lastStreamEntryIdParts = lastStreamEntryId.Split("-");
+            int lastStreamEntryIdTime = int.Parse(lastStreamEntryIdParts[0]);
+            int lastStreamEntryIdSeq = int.Parse(lastStreamEntryIdParts[1]);
+
+            return streamEntryIdTime == lastStreamEntryIdTime
+                ? $"{streamEntryIdTime}-{lastStreamEntryIdSeq + 1}"
+                : $"{streamEntryIdTime}-0";
         }
 
         public static bool IsStreamEntryIdValid(string streamEntryId, string streamKey, out string errorMessage)
