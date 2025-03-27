@@ -1,15 +1,32 @@
-﻿using System.Text;
+﻿using codecrafters_redis.src.Data;
+using System.Text;
 
 namespace codecrafters_redis.src
 {
     public class Utilities
     {
-        public static string BuildArrayString(string[] args)
+        public static string BuildArrayString(string[] args, bool noEndline = false)
         {
             var answer = string.Format("*{0}\r\n", args.Length);
-            foreach (var item in args)
+            for (int i = 0; i < args.Length; i++)
             {
-                answer += string.Format("${0}\r\n{1}\r\n", item.Length, item);
+                var item = args[i];
+                answer += string.Format("${0}\r\n{1}", item.Length, item);
+                answer += (noEndline && i == args.Length - 1) ? "" : "\r\n";
+            }
+            return answer;
+        }
+
+        public static string BuildNestedArrayString(XRangeOutput[] outputs)
+        {
+            var answer = string.Format("*{0}\r\n", outputs.Length);
+            foreach (var output in outputs)
+            {
+                answer += string.Format("*2\r\n${0}\r\n{1}\r\n*{2}\r\n", output.Id.Length, output.Id, output.Fields.Length);
+                foreach (var field in output.Fields)
+                {
+                    answer += string.Format("${0}\r\n{1}\r\n", field.Length, field);
+                }
             }
             return answer;
         }

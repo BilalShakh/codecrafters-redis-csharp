@@ -1,4 +1,5 @@
 ﻿using codecrafters_redis.src.Data;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -64,7 +65,7 @@ namespace codecrafters_redis.src
                     Console.WriteLine("Master Received data: " + receivedData);
 
                     string response = string.Empty;
-                    switch (request[2])
+                    switch (request[2].ToUpper())
                     {
                         case "PING":
                             response = "+PONG\r\n";
@@ -169,6 +170,9 @@ namespace codecrafters_redis.src
                             break;
                         case "XADD":
                             response = HandleXADD(request);
+                            break;
+                        case "XRANGE":
+                            response = HandleXRANGE(request);
                             break;
                         default:
                             response = "-ERR unknown command\r\n";
@@ -338,6 +342,54 @@ namespace codecrafters_redis.src
                 streamStore[Key].AddToStore(streamEntryId, pair[0], pair[1]);
             }
             return Utilities.BuildBulkString(streamEntryId);
+        }
+
+        private static string HandleXRANGE(string[] input)
+        {
+            if (input.Length != 9)
+            {
+                throw new Exception("Invalid input for handle xrange.");
+            }
+            string key = input[4];
+            
+            string start = input[6];
+            string[] startParts = start.Split("-");
+            string startTimestamp = startParts[0];
+            string startSeq = startParts[1];
+
+            string end = input[8];
+            string[] endParts = end.Split("-");
+            string endTimestamp = endParts[0];
+            string endSeq = endParts[1];
+
+
+            if (streamStore.TryGetValue(key, out StreamEntry? streamEntry))
+            {
+                var streamEntries = streamEntry.Store.Where(kvp =>
+                {
+                    string streamEntryId = kvp.Key;
+                    string[] streamEntryIdParts = streamEntryId.Split("-");
+                    int streamEntryIdTime = int.Parse(streamEntryIdParts[0]);
+                    int streamEntryIdSeq = int.Parse(streamEntryIdParts[1]);
+                    return streamEntryIdTime >= int.Parse(startTimestamp) && streamEntryIdTime <= int.Parse(endTimestamp) &&
+                           streamEntryIdSeq >= int.Parse(startSeq) && streamEntryIdSeq <= int.Parse(endSeq);
+                }).ToArray();
+
+                XRangeOutput[] result = new XRangeOutput[streamEntries.Length];
+                int i = 0;
+                foreach (var streamEntryRes in streamEntries)
+                {
+                    string streamEntryKey = streamEntryRes.Key;
+                    string[] valueParts = streamEntryRes.Value.Select(kvp => new string[] { kvp.Key, kvp.Value }).SelectMany(x => x).ToArray();
+                    //Console.WriteLine("Stream Entry Key: " + streamEntryKey + " Stream Entry Value: " + streamEntryValue);
+                    result[i++] = new XRangeOutput { Id = streamEntryKey, Fields = valueParts };
+                }
+                return Utilities.BuildNestedArrayString(result);
+            }
+            else
+            {
+                return "*0\r\n";
+            }
         }
 
         private static async Task<int> HandleWait(string[] input)
