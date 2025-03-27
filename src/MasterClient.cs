@@ -359,8 +359,8 @@ namespace codecrafters_redis.src
 
             string end = input[8];
             string[] endParts = end.Split("-");
-            string endTimestamp = endParts[0];
-            string endSeq = endParts[1];
+            string endTimestamp = end == "+" ? string.Empty : endParts[0];
+            string endSeq = end == "+" ? string.Empty : endParts[1];
 
 
             if (streamStore.TryGetValue(key, out StreamEntry? streamEntry))
@@ -371,8 +371,10 @@ namespace codecrafters_redis.src
                     string[] streamEntryIdParts = streamEntryId.Split("-");
                     int streamEntryIdTime = int.Parse(streamEntryIdParts[0]);
                     int streamEntryIdSeq = int.Parse(streamEntryIdParts[1]);
-                    return (startTimestamp == string.Empty || streamEntryIdTime >= int.Parse(startTimestamp)) && streamEntryIdTime <= int.Parse(endTimestamp) &&
-                           (startSeq == string.Empty || streamEntryIdSeq >= int.Parse(startSeq)) && streamEntryIdSeq <= int.Parse(endSeq);
+                    return (startTimestamp == string.Empty || streamEntryIdTime >= int.Parse(startTimestamp)) && 
+                           (endTimestamp == string.Empty || streamEntryIdTime <= int.Parse(endTimestamp)) &&
+                           (startSeq == string.Empty || streamEntryIdSeq >= int.Parse(startSeq)) && 
+                           (endSeq == string.Empty || streamEntryIdSeq <= int.Parse(endSeq));
                 }).ToArray();
 
                 XRangeOutput[] result = new XRangeOutput[streamEntries.Length];
