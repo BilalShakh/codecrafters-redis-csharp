@@ -174,6 +174,9 @@ namespace codecrafters_redis.src
                         case "XRANGE":
                             response = HandleXRANGE(request);
                             break;
+                        case "XREAD":
+                            response = HandleXRead(request);
+                            break;
                         default:
                             response = "-ERR unknown command\r\n";
                             break;
@@ -344,6 +347,56 @@ namespace codecrafters_redis.src
             return Utilities.BuildBulkString(streamEntryId);
         }
 
+        private static string HandleXRead(string[] input)
+        {
+            if (input.Length < 9)
+            {
+                throw new Exception("Invalid input for handle xread. Length: " + input.Length);
+            }
+            string[] keys = new string[(input.Length - 5) / 4];
+            string[] starts = new string[(input.Length - 5) / 4];
+            List<XReadOutput> result = [];
+
+            for (int i = 5, j = 0; i + 1 < input.Length && j < keys.Length; i += 2, j++)
+            {
+                keys[j] = input[i+1];
+            }
+
+            for (int i = 5 + ((input.Length - 5) / 2), j = 0; i + 1 < input.Length && j < starts.Length; i += 2, j++)
+            {
+                starts[j] = input[i + 1];
+            }
+
+            int startsIndex = 0;
+            
+            foreach (var key in keys)
+            {
+                if (streamStore.TryGetValue(key, out StreamEntry? streamEntry))
+                {
+                    string[] startParts = starts[startsIndex++].Split("-");
+                    var streamEntries = streamEntry.Store.Where(kvp =>
+                    {
+                        string streamEntryId = kvp.Key;
+                        string[] streamEntryIdParts = streamEntryId.Split("-");
+                        int streamEntryIdTime = int.Parse(streamEntryIdParts[0]);
+                        int streamEntryIdSeq = int.Parse(streamEntryIdParts[1]);
+                        return streamEntryIdTime >= int.Parse(startParts[0]) && streamEntryIdSeq >= int.Parse(startParts[1]);
+                    }).ToArray();
+
+                    List<XRangeOutput> outputs = [];
+                    foreach (var streamEntryRes in streamEntries)
+                    {
+                        string streamEntryKey = streamEntryRes.Key;
+                        string[] valueParts = streamEntryRes.Value.Select(kvp => new string[] { kvp.Key, kvp.Value }).SelectMany(x => x).ToArray();
+                        outputs.Add(new XRangeOutput { Id = streamEntryKey, Fields = valueParts });
+                    }
+                    result.Add(new XReadOutput { StreamName = key, Outputs = outputs });
+                }
+            }
+
+            return Utilities.BuildXReadOutputArrayString(result.ToArray());
+        }
+
         private static string HandleXRANGE(string[] input)
         {
             if (input.Length != 9)
@@ -362,6 +415,7 @@ namespace codecrafters_redis.src
             string endTimestamp = end == "+" ? string.Empty : endParts[0];
             string endSeq = end == "+" ? string.Empty : endParts[1];
 
+            Console.WriteLine("Start: " + start + " End: " + end);
 
             if (streamStore.TryGetValue(key, out StreamEntry? streamEntry))
             {

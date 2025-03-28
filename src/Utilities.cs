@@ -31,6 +31,37 @@ namespace codecrafters_redis.src
             return answer;
         }
 
+        public static string BuildXReadOutputArrayString(XReadOutput[] outputs)
+        {
+            var sb = new StringBuilder();
+            sb.AppendFormat("*{0}\r\n", outputs.Length);
+
+            foreach (var output in outputs)
+            {
+                sb.Append("*2\r\n");
+                sb.AppendFormat("${0}\r\n{1}\r\n", output.StreamName.Length, output.StreamName);
+                sb.AppendFormat("*{0}\r\n", output.Outputs.Count);
+
+                foreach (var rangeOutput in output.Outputs)
+                {
+                    sb.Append("*2\r\n");
+                    sb.AppendFormat("${0}\r\n{1}\r\n", rangeOutput.Id.Length, rangeOutput.Id);
+                    sb.AppendFormat("*{0}\r\n", rangeOutput.Fields.Length / 2);
+
+                    for (int i = 0; i + 1 < rangeOutput.Fields.Length; i += 2)
+                    {
+                        string field = rangeOutput.Fields[i];
+                        string value = rangeOutput.Fields[i + 1];
+                        sb.AppendFormat("${0}\r\n{1}\r\n", field.Length, field);
+                        sb.AppendFormat("${0}\r\n{1}\r\n", value.Length, value);
+                    }
+                }
+            }
+
+            return sb.ToString();
+        }
+
+
         public static string BuildBulkString(string value)
         {
             return $"${value.Length}\r\n{value}\r\n";
