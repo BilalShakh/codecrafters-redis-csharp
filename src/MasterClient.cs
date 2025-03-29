@@ -10,6 +10,8 @@ namespace codecrafters_redis.src
     {
         public static readonly Dictionary<string, string> dataStore = [];
         public static readonly Dictionary<string, StreamEntry> streamStore = [];
+        public static readonly Dictionary<string, StreamEntry> newlyAddedStreamStore = [];
+        private static bool isBlockingRead = false;
         private static string MasterReplicationId = string.Empty;
         public static int MasterReplicationOffset = 0;
         private static string MasterHost = string.Empty;
@@ -175,7 +177,7 @@ namespace codecrafters_redis.src
                             response = HandleXRANGE(request);
                             break;
                         case "XREAD":
-                            response = HandleXRead(request);
+                            response = await Task.Run(() => HandleXRead(request));
                             break;
                         default:
                             response = "-ERR unknown command\r\n";
@@ -319,7 +321,12 @@ namespace codecrafters_redis.src
             {
                 streamStore.Add(Key, new StreamEntry { Store = [] });
             }
-            
+
+            if (isBlockingRead && !newlyAddedStreamStore.ContainsKey(Key))
+            {
+                newlyAddedStreamStore.Add(Key, new StreamEntry { Store = [] });
+            }
+
             string streamEntryId = input[6];
             string errorMessage = string.Empty;
             
@@ -338,11 +345,19 @@ namespace codecrafters_redis.src
             }
             
             streamStore[Key].Store.Add(streamEntryId, []);
+            if (isBlockingRead)
+            {
+                newlyAddedStreamStore[Key].Store.Add(streamEntryId, []);
+            }
             string[][] keyValuePairs = ParseStreamKeyValuePairs(input);
             foreach (var pair in keyValuePairs)
             {
                 Console.WriteLine("Added Key: " + pair[0] + " Value: " + pair[1]);
                 streamStore[Key].AddToStore(streamEntryId, pair[0], pair[1]);
+                if (isBlockingRead)
+                {
+                    newlyAddedStreamStore[Key].AddToStore(streamEntryId, pair[0], pair[1]);
+                }
             }
             return Utilities.BuildBulkString(streamEntryId);
         }
@@ -356,22 +371,76 @@ namespace codecrafters_redis.src
             string[] keys = new string[(input.Length - 5) / 4];
             string[] starts = new string[(input.Length - 5) / 4];
             List<XReadOutput> result = [];
+            int keysStartIndex = 5;
+            int startsStartIndex = 5 + ((input.Length - 5) / 2);
+            int blockingTime = 0;
 
-            for (int i = 5, j = 0; i + 1 < input.Length && j < keys.Length; i += 2, j++)
+            if (input[4] == "block")
+            {
+                keysStartIndex = 9;
+                startsStartIndex = 9 + ((input.Length - 9) / 2);
+                keys = new string[(input.Length - 9) / 4];
+                starts = new string[(input.Length - 9) / 4];
+                blockingTime = int.Parse(input[6]);
+            }
+
+            for (int i = keysStartIndex, j = 0; i + 1 < input.Length && j < keys.Length; i += 2, j++)
             {
                 keys[j] = input[i+1];
             }
 
-            for (int i = 5 + ((input.Length - 5) / 2), j = 0; i + 1 < input.Length && j < starts.Length; i += 2, j++)
+            for (int i = startsStartIndex, j = 0; i + 1 < input.Length && j < starts.Length; i += 2, j++)
             {
                 starts[j] = input[i + 1];
+            }
+
+            if (blockingTime != 0)
+            {
+                return HandleBlockingRead(blockingTime, keys, starts);
             }
 
             int startsIndex = 0;
             
             foreach (var key in keys)
             {
-                if (streamStore.TryGetValue(key, out StreamEntry? streamEntry))
+                result = GetXReadOutputs(keys, starts, streamStore);
+            }
+
+            return Utilities.BuildXReadOutputArrayString(result.ToArray());
+        }
+
+        private static string HandleBlockingRead(int blockingTime, string[] keys, string[] starts)
+        {
+            Console.WriteLine("Blocking read for: " + blockingTime);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            List<XReadOutput> result = [];
+            isBlockingRead = true;
+            while (stopwatch.ElapsedMilliseconds < blockingTime)
+            {
+                if (newlyAddedStreamStore.Count != 0)
+                {
+                    result = GetXReadOutputs(keys, starts, newlyAddedStreamStore);
+
+                    if (result.Count != 0)
+                    {
+                        newlyAddedStreamStore.Clear();
+                        return Utilities.BuildXReadOutputArrayString(result.ToArray());
+                    }
+                }
+            }
+            isBlockingRead = false;
+            newlyAddedStreamStore.Clear();
+            // If the timer runs out, return the null output
+            return "$-1\r\n";
+        }
+
+        private static List<XReadOutput> GetXReadOutputs(string[] keys, string[] starts, Dictionary<string, StreamEntry> store)
+        {
+            List<XReadOutput> result = [];
+            int startsIndex = 0;
+            foreach (var key in keys)
+            {
+                if (store.TryGetValue(key, out StreamEntry? streamEntry))
                 {
                     string[] startParts = starts[startsIndex++].Split("-");
                     var streamEntries = streamEntry.Store.Where(kvp =>
@@ -382,7 +451,6 @@ namespace codecrafters_redis.src
                         int streamEntryIdSeq = int.Parse(streamEntryIdParts[1]);
                         return streamEntryIdTime >= int.Parse(startParts[0]) && streamEntryIdSeq >= int.Parse(startParts[1]);
                     }).ToArray();
-
                     List<XRangeOutput> outputs = [];
                     foreach (var streamEntryRes in streamEntries)
                     {
@@ -393,8 +461,7 @@ namespace codecrafters_redis.src
                     result.Add(new XReadOutput { StreamName = key, Outputs = outputs });
                 }
             }
-
-            return Utilities.BuildXReadOutputArrayString(result.ToArray());
+            return result;
         }
 
         private static string HandleXRANGE(string[] input)
